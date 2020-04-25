@@ -33,7 +33,8 @@ namespace Microsoft.EntityFrameworkCore
                 base.OnModelCreating(modelBuilder, context);
 
                 modelBuilder
-                    .Query<BlogQuery>()
+                    .Entity<BlogQuery>()
+                    .HasNoKey()
                     .ToQuery(() => context.Set<Blog>().Select(b => new BlogQuery(b.Title, b.MonthlyRevenue)));
             }
         }

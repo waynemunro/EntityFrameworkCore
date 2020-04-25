@@ -2,7 +2,6 @@
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
-using System.Globalization;
 using JetBrains.Annotations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion.Internal;
 
@@ -32,6 +31,7 @@ namespace Microsoft.EntityFrameworkCore.Storage.ValueConversion
         ///     A <see cref="ValueConverterInfo" /> for the default use of this converter.
         /// </summary>
         public static ValueConverterInfo DefaultInfo { get; }
-            = new ValueConverterInfo(typeof(DateTimeOffset), typeof(string), i => new DateTimeOffsetToStringConverter(i.MappingHints), _defaultHints);
+            = new ValueConverterInfo(
+                typeof(DateTimeOffset), typeof(string), i => new DateTimeOffsetToStringConverter(i.MappingHints), _defaultHints);
     }
 }

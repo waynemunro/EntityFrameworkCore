@@ -12,9 +12,11 @@ namespace Microsoft.EntityFrameworkCore
     {
         protected override ICollection<Type> IgnoredTestBases { get; } = new HashSet<Type>
         {
+            // No in-memory tests
             typeof(FunkyDataQueryTestBase<>),
             typeof(OptimisticConcurrencyTestBase<>),
-            typeof(StoreGeneratedTestBase<>)
+            typeof(StoreGeneratedTestBase<>),
+            typeof(ConferencePlannerTestBase<>)
         };
 
         protected override Assembly TargetAssembly { get; } = typeof(InMemoryComplianceTest).Assembly;

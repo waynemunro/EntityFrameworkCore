@@ -3,6 +3,7 @@
 
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Microsoft.EntityFrameworkCore.ModelBuilding
 {
@@ -10,10 +11,15 @@ namespace Microsoft.EntityFrameworkCore.ModelBuilding
     {
         protected override DbContextOptions Configure()
             => new DbContextOptionsBuilder()
+                .UseInternalServiceProvider(
+                    new ServiceCollection()
+                        .AddEntityFrameworkSqlServer()
+                        .AddSingleton<IModelCacheKeyFactory, TestModelCacheKeyFactory>()
+                        .BuildServiceProvider())
                 .UseSqlServer("Database = None")
                 .Options;
 
-        protected override void RunThrowDifferPipeline(DbContext context)
-            => context.GetService<IMigrationsModelDiffer>().GetDifferences(null, context.Model);
+        protected override void RunThroughDifferPipeline(DbContext context)
+            => context.GetService<IMigrationsModelDiffer>().GetDifferences(null, context.Model.GetRelationalModel());
     }
 }

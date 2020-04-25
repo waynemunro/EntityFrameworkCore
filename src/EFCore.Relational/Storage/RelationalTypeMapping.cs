@@ -9,11 +9,9 @@ using System.Globalization;
 using System.Linq.Expressions;
 using System.Reflection;
 using JetBrains.Annotations;
-using Microsoft.EntityFrameworkCore.Internal;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Microsoft.EntityFrameworkCore.Utilities;
 
-#pragma warning disable 618
 namespace Microsoft.EntityFrameworkCore.Storage
 {
     /// <summary>
@@ -68,24 +66,6 @@ namespace Microsoft.EntityFrameworkCore.Storage
                 Precision = precision ?? converterHints?.Precision;
                 Scale = scale ?? converterHints?.Scale;
                 FixedLength = fixedLength;
-                PrecisionAndScaleOverriden = false;
-            }
-
-            // #12405
-            private RelationalTypeMappingParameters(
-                CoreTypeMappingParameters coreParameters,
-                [NotNull] string storeType,
-                StoreTypePostfix storeTypePostfix = StoreTypePostfix.None,
-                DbType? dbType = null,
-                bool unicode = false,
-                int? size = null,
-                bool fixedLength = false,
-                int? precision = null,
-                int? scale = null,
-                bool precisionAndScaleOverriden = false)
-                : this(coreParameters, storeType, storeTypePostfix, dbType, unicode, size, fixedLength, precision, scale)
-            {
-                PrecisionAndScaleOverriden = precisionAndScaleOverriden;
             }
 
             /// <summary>
@@ -124,14 +104,6 @@ namespace Microsoft.EntityFrameworkCore.Storage
             public int? Scale { get; }
 
             /// <summary>
-            ///     This is provided for compatibility with 2.1 providers and shouldn't be used
-            /// </summary>
-            // If not set fallback to 2.1 behavior by using Precision and Scale from the converter
-            // #12405
-            [Obsolete("This is provided for compatibility with 2.1 providers and shouldn't be used")]
-            public bool PrecisionAndScaleOverriden { get; }
-
-            /// <summary>
             ///     The mapping fixed-length flag.
             /// </summary>
             public bool FixedLength { get; }
@@ -157,8 +129,7 @@ namespace Microsoft.EntityFrameworkCore.Storage
                     mappingInfo.Size ?? Size,
                     mappingInfo.IsFixedLength ?? FixedLength,
                     mappingInfo.Precision ?? Precision,
-                    mappingInfo.Scale ?? Scale,
-                    PrecisionAndScaleOverriden);
+                    mappingInfo.Scale ?? Scale);
 
             /// <summary>
             ///     Creates a new <see cref="RelationalTypeMappingParameters" /> parameter object with the given
@@ -181,8 +152,7 @@ namespace Microsoft.EntityFrameworkCore.Storage
                     size,
                     FixedLength,
                     Precision,
-                    Scale,
-                    PrecisionAndScaleOverriden);
+                    Scale);
 
             /// <summary>
             ///     Creates a new <see cref="RelationalTypeMappingParameters" /> parameter object with the given
@@ -203,8 +173,7 @@ namespace Microsoft.EntityFrameworkCore.Storage
                     Size,
                     FixedLength,
                     precision,
-                    scale,
-                    precisionAndScaleOverriden: true);
+                    scale);
 
             /// <summary>
             ///     Creates a new <see cref="RelationalTypeMappingParameters" /> parameter object with the given
@@ -222,38 +191,38 @@ namespace Microsoft.EntityFrameworkCore.Storage
                     Size,
                     FixedLength,
                     Precision,
-                    Scale,
-                    PrecisionAndScaleOverriden);
+                    Scale);
         }
 
         private static readonly MethodInfo _getFieldValueMethod
-            = typeof(DbDataReader).GetTypeInfo().GetDeclaredMethod(nameof(DbDataReader.GetFieldValue));
+            = GetDataReaderMethod(nameof(DbDataReader.GetFieldValue));
 
         private static readonly IDictionary<Type, MethodInfo> _getXMethods
             = new Dictionary<Type, MethodInfo>
             {
-                { typeof(bool), typeof(DbDataReader).GetTypeInfo().GetDeclaredMethod(nameof(DbDataReader.GetBoolean)) },
-                { typeof(byte), typeof(DbDataReader).GetTypeInfo().GetDeclaredMethod(nameof(DbDataReader.GetByte)) },
-                { typeof(char), typeof(DbDataReader).GetTypeInfo().GetDeclaredMethod(nameof(DbDataReader.GetChar)) },
-                { typeof(DateTime), typeof(DbDataReader).GetTypeInfo().GetDeclaredMethod(nameof(DbDataReader.GetDateTime)) },
-                { typeof(decimal), typeof(DbDataReader).GetTypeInfo().GetDeclaredMethod(nameof(DbDataReader.GetDecimal)) },
-                { typeof(double), typeof(DbDataReader).GetTypeInfo().GetDeclaredMethod(nameof(DbDataReader.GetDouble)) },
-                { typeof(float), typeof(DbDataReader).GetTypeInfo().GetDeclaredMethod(nameof(DbDataReader.GetFloat)) },
-                { typeof(Guid), typeof(DbDataReader).GetTypeInfo().GetDeclaredMethod(nameof(DbDataReader.GetGuid)) },
-                { typeof(short), typeof(DbDataReader).GetTypeInfo().GetDeclaredMethod(nameof(DbDataReader.GetInt16)) },
-                { typeof(int), typeof(DbDataReader).GetTypeInfo().GetDeclaredMethod(nameof(DbDataReader.GetInt32)) },
-                { typeof(long), typeof(DbDataReader).GetTypeInfo().GetDeclaredMethod(nameof(DbDataReader.GetInt64)) },
-                { typeof(string), typeof(DbDataReader).GetTypeInfo().GetDeclaredMethod(nameof(DbDataReader.GetString)) }
+                { typeof(bool), GetDataReaderMethod(nameof(DbDataReader.GetBoolean)) },
+                { typeof(byte), GetDataReaderMethod(nameof(DbDataReader.GetByte)) },
+                { typeof(char), GetDataReaderMethod(nameof(DbDataReader.GetChar)) },
+                { typeof(DateTime), GetDataReaderMethod(nameof(DbDataReader.GetDateTime)) },
+                { typeof(decimal), GetDataReaderMethod(nameof(DbDataReader.GetDecimal)) },
+                { typeof(double), GetDataReaderMethod(nameof(DbDataReader.GetDouble)) },
+                { typeof(float), GetDataReaderMethod(nameof(DbDataReader.GetFloat)) },
+                { typeof(Guid), GetDataReaderMethod(nameof(DbDataReader.GetGuid)) },
+                { typeof(short), GetDataReaderMethod(nameof(DbDataReader.GetInt16)) },
+                { typeof(int), GetDataReaderMethod(nameof(DbDataReader.GetInt32)) },
+                { typeof(long), GetDataReaderMethod(nameof(DbDataReader.GetInt64)) },
+                { typeof(string), GetDataReaderMethod(nameof(DbDataReader.GetString)) }
             };
+
+        private static MethodInfo GetDataReaderMethod(string name)
+            => typeof(DbDataReader).GetRuntimeMethod(name, new[] { typeof(int) });
 
         /// <summary>
         ///     Gets the mapping to be used when the only piece of information is that there is a null value.
         /// </summary>
         public static readonly RelationalTypeMapping NullMapping = new NullTypeMapping("NULL");
 
-        private readonly bool _precisionAndScaleOverriden;
-
-        private class NullTypeMapping : RelationalTypeMapping
+        private sealed class NullTypeMapping : RelationalTypeMapping
         {
             public NullTypeMapping(string storeType)
                 : base(storeType, typeof(object))
@@ -272,51 +241,59 @@ namespace Microsoft.EntityFrameworkCore.Storage
             : base(parameters.CoreParameters)
         {
             Parameters = parameters;
-            _precisionAndScaleOverriden = parameters.PrecisionAndScaleOverriden;
 
-            var size = parameters.Size;
             var storeType = parameters.StoreType;
 
             if (storeType != null)
             {
-                StoreTypeNameBase = GetBaseName(storeType);
-                if (size != null
-                    && parameters.StoreTypePostfix == StoreTypePostfix.Size)
-                {
-                    storeType = StoreTypeNameBase + "(" + size + ")";
-                }
-                else if (parameters.StoreTypePostfix == StoreTypePostfix.PrecisionAndScale
-                         || parameters.StoreTypePostfix == StoreTypePostfix.Precision)
-                {
-                    var precision = parameters.Precision;
-                    var converter = parameters.CoreParameters.Converter;
-                    // Fallback to 2.1 behavior
-                    // #12405
-                    var oldBehavior = !_precisionAndScaleOverriden;
-                    if (oldBehavior)
-                    {
-                        precision = converter?.MappingHints?.Precision;
-                    }
+                var storeTypeNameBase = GetBaseName(storeType);
+                StoreTypeNameBase = storeTypeNameBase;
 
-                    if (precision != null)
-                    {
-                        var scale = parameters.Scale;
-                        if (oldBehavior)
-                        {
-                            scale = converter.MappingHints?.Scale;
-                        }
-
-                        storeType = StoreTypeNameBase
-                                    + "("
-                                    + (scale == null || parameters.StoreTypePostfix == StoreTypePostfix.Precision
-                                        ? precision.ToString()
-                                        : precision + "," + scale)
-                                    + ")";
-                    }
-                }
+                storeType = ProcessStoreType(parameters, storeType, storeTypeNameBase);
             }
 
             StoreType = storeType;
+        }
+
+        /// <summary>
+        ///     Processes the store type name to add appropriate postfix/prefix text as needed.
+        /// </summary>
+        /// <param name="parameters"> The parameters for this mapping. </param>
+        /// <param name="storeType"> The specified store type name. </param>
+        /// <param name="storeTypeNameBase"> The calculated based name</param>
+        /// <returns> The store type name to use. </returns>
+        protected virtual string ProcessStoreType(
+            RelationalTypeMappingParameters parameters,
+            [NotNull] string storeType,
+            [NotNull] string storeTypeNameBase)
+        {
+            Check.NotNull(storeType, nameof(storeType));
+            Check.NotNull(storeTypeNameBase, nameof(storeTypeNameBase));
+
+            var size = parameters.Size;
+
+            if (size != null
+                && parameters.StoreTypePostfix == StoreTypePostfix.Size)
+            {
+                storeType = storeTypeNameBase + "(" + size + ")";
+            }
+            else if (parameters.StoreTypePostfix == StoreTypePostfix.PrecisionAndScale
+                || parameters.StoreTypePostfix == StoreTypePostfix.Precision)
+            {
+                var precision = parameters.Precision;
+                if (precision != null)
+                {
+                    var scale = parameters.Scale;
+                    storeType = storeTypeNameBase
+                        + "("
+                        + (scale == null || parameters.StoreTypePostfix == StoreTypePostfix.Precision
+                            ? precision.ToString()
+                            : precision + "," + scale)
+                        + ")";
+                }
+            }
+
+            return storeType;
         }
 
         private static string GetBaseName(string storeType)
@@ -338,14 +315,21 @@ namespace Microsoft.EntityFrameworkCore.Storage
         /// <param name="dbType"> The <see cref="System.Data.DbType" /> to be used. </param>
         /// <param name="unicode"> A value indicating whether the type should handle Unicode data or not. </param>
         /// <param name="size"> The size of data the property is configured to store, or null if no size is configured. </param>
+        /// <param name="fixedLength"> A value indicating whether the type has fixed length data or not. </param>
+        /// <param name="precision"> The precision of data the property is configured to store, or null if no precision is configured. </param>
+        /// <param name="scale"> The scale of data the property is configured to store, or null if no scale is configured. </param>
         protected RelationalTypeMapping(
             [NotNull] string storeType,
             [NotNull] Type clrType,
             DbType? dbType = null,
             bool unicode = false,
-            int? size = null)
-            : this(new RelationalTypeMappingParameters(
-                new CoreTypeMappingParameters(clrType), storeType, StoreTypePostfix.None, dbType, unicode, size))
+            int? size = null,
+            bool fixedLength = false,
+            int? precision = null,
+            int? scale = null)
+            : this(
+                new RelationalTypeMappingParameters(
+                    new CoreTypeMappingParameters(clrType), storeType, StoreTypePostfix.None, dbType, unicode, size, fixedLength, precision, scale))
         {
         }
 
@@ -359,8 +343,7 @@ namespace Microsoft.EntityFrameworkCore.Storage
         /// </summary>
         /// <param name="parameters"> The parameters for this mapping. </param>
         /// <returns> The newly created mapping. </returns>
-        protected virtual RelationalTypeMapping Clone(RelationalTypeMappingParameters parameters)
-            => throw new NotImplementedException(CoreStrings.ConverterCloneNotImplemented(GetType().ShortDisplayName()));
+        protected abstract RelationalTypeMapping Clone(RelationalTypeMappingParameters parameters);
 
         /// <summary>
         ///     Creates a copy of this mapping.
@@ -395,59 +378,7 @@ namespace Microsoft.EntityFrameworkCore.Storage
         /// <param name="mappingInfo"> The mapping info containing the facets to use. </param>
         /// <returns> The cloned mapping, or the original mapping if no clone was needed. </returns>
         public virtual RelationalTypeMapping Clone(in RelationalTypeMappingInfo mappingInfo)
-        {
-            var checkStoreTypeAndSize = true;
-            RelationalTypeMapping clone = null;
-            if ((mappingInfo.Scale != null
-                 && mappingInfo.Scale != Parameters.Scale
-                 && StoreTypePostfix == StoreTypePostfix.PrecisionAndScale)
-                || (mappingInfo.Precision != null
-                    && mappingInfo.Precision != Parameters.Precision
-                    && (StoreTypePostfix == StoreTypePostfix.PrecisionAndScale
-                        || StoreTypePostfix == StoreTypePostfix.Precision)))
-            {
-                var oldBehavior = !_precisionAndScaleOverriden;
-                if (!oldBehavior)
-                {
-                    var storeTypeChanged = mappingInfo.StoreTypeNameBase != null
-                                            && !string.Equals(mappingInfo.StoreTypeNameBase, StoreTypeNameBase, StringComparison.OrdinalIgnoreCase);
-
-                    clone = storeTypeChanged
-                        ? Clone(Parameters.WithTypeMappingInfo(mappingInfo))
-                        : Clone(
-                            mappingInfo.Precision ?? Parameters.Precision,
-                            mappingInfo.Scale ?? Parameters.Scale);
-
-                    // Fallback to 2.1 behavior if Clone is not overriden
-                    // #12405
-                    oldBehavior = clone.GetType() != GetType();
-                }
-
-                checkStoreTypeAndSize = oldBehavior;
-            }
-
-            if (checkStoreTypeAndSize)
-            {
-                var storeTypeOrSizeChanged = (mappingInfo.Size != null
-                                              && mappingInfo.Size != Size
-                                              && StoreTypePostfix == StoreTypePostfix.Size)
-                                             || (mappingInfo.StoreTypeName != null
-                                                 && !string.Equals(mappingInfo.StoreTypeName, StoreType, StringComparison.OrdinalIgnoreCase));
-
-                clone = storeTypeOrSizeChanged
-                    ? Clone(
-                        mappingInfo.StoreTypeName ?? StoreType,
-                        mappingInfo.Size ?? Size)
-                    : this;
-            }
-
-            if (clone.GetType() != GetType())
-            {
-                throw new NotImplementedException(CoreStrings.ConverterCloneNotImplemented(GetType().ShortDisplayName()));
-            }
-
-            return clone;
-        }
+            => Clone(Parameters.WithTypeMappingInfo(mappingInfo));
 
         /// <summary>
         ///     Gets the name of the database type.
@@ -479,6 +410,16 @@ namespace Microsoft.EntityFrameworkCore.Storage
         /// </summary>
         public virtual int? Size => Parameters.Size;
 
+         /// <summary>
+        ///     Gets the precision of data the property is configured to store, or null if no precision is configured.
+        /// </summary>
+        public virtual int? Precision => Parameters.Precision;
+
+         /// <summary>
+        ///     Gets the scale of data the property is configured to store, or null if no scale is configured.
+        /// </summary>
+        public virtual int? Scale => Parameters.Scale;
+
         /// <summary>
         ///     Gets a value indicating whether the type is constrained to fixed-length data.
         /// </summary>
@@ -509,8 +450,8 @@ namespace Microsoft.EntityFrameworkCore.Storage
             parameter.Direction = ParameterDirection.Input;
             parameter.ParameterName = name;
 
-            if (Converter != null
-                && !IsLegacyEnumValue(Converter, value))
+            value = ConvertUnderlyingEnumValueToEnum(value);
+            if (Converter != null)
             {
                 value = Converter.ConvertToProvider(value);
             }
@@ -532,22 +473,14 @@ namespace Microsoft.EntityFrameworkCore.Storage
             return parameter;
         }
 
-        // Avoid converting value from enum to integer if it is already an integer; preserves 2.0 behavior
-        private static bool IsLegacyEnumValue(ValueConverter converter, object value)
-            => value != null
-               && IsLegacyInteger(value.GetType())
-               && converter.GetType().IsGenericType
-               && converter.GetType().GetGenericTypeDefinition() == typeof(EnumToNumberConverter<,>);
-
-        private static bool IsLegacyInteger(Type type)
-        {
-            type = type.UnwrapNullableType();
-
-            return type == typeof(int)
-                   || type == typeof(long)
-                   || type == typeof(short)
-                   || type == typeof(byte);
-        }
+        // Enum when compared to constant will always have value of integral type
+        // when enum would contain convert node. We remove the convert node but we also
+        // need to convert the integral value to enum value.
+        // This allows us to use converter on enum value or print enum value directly if supported by provider
+        private object ConvertUnderlyingEnumValueToEnum(object value)
+            => value?.GetType().IsInteger() == true && ClrType.UnwrapNullableType().IsEnum
+            ? Enum.ToObject(ClrType.UnwrapNullableType(), value)
+            : value;
 
         /// <summary>
         ///     Configures type information of a <see cref="DbParameter" />.
@@ -566,6 +499,8 @@ namespace Microsoft.EntityFrameworkCore.Storage
         /// </returns>
         public virtual string GenerateSqlLiteral([CanBeNull] object value)
         {
+            value = ConvertUnderlyingEnumValueToEnum(value);
+
             if (Converter != null)
             {
                 value = Converter.ConvertToProvider(value);
@@ -605,10 +540,18 @@ namespace Microsoft.EntityFrameworkCore.Storage
         {
             var type = (Converter?.ProviderClrType ?? ClrType).UnwrapNullableType();
 
-            return _getXMethods.TryGetValue(type, out var method)
+            return GetDataReaderMethod(type);
+        }
+
+        /// <summary>
+        ///     The method to use when reading values of the given type. The method must be defined
+        ///     on <see cref="DbDataReader" />.
+        /// </summary>
+        /// <returns> The method to use to read the value. </returns>
+        public static MethodInfo GetDataReaderMethod([NotNull] Type type)
+            => _getXMethods.TryGetValue(type, out var method)
                 ? method
                 : _getFieldValueMethod.MakeGenericMethod(type);
-        }
 
         /// <summary>
         ///     Gets a custom expression tree for reading the value from the input data reader

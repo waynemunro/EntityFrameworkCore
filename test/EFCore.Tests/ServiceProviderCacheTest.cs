@@ -2,7 +2,9 @@
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
+using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.EntityFrameworkCore.Diagnostics.Internal;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Internal;
 using Microsoft.EntityFrameworkCore.TestUtilities;
@@ -14,7 +16,7 @@ namespace Microsoft.EntityFrameworkCore
 {
     public class ServiceProviderCacheTest
     {
-        [Fact]
+        [ConditionalFact]
         public void Returns_same_provider_for_same_type_of_configured_extensions()
         {
             var loggerFactory = new ListLoggerFactory();
@@ -26,14 +28,14 @@ namespace Microsoft.EntityFrameworkCore
 
             Assert.Same(cache.GetOrAdd(config1, true), cache.GetOrAdd(config2, true));
 
-            Assert.Equal(1, loggerFactory.Log.Count);
+            Assert.Single(loggerFactory.Log);
 
             Assert.Equal(
-                CoreStrings.LogServiceProviderCreated.GenerateMessage(),
+                CoreResources.LogServiceProviderCreated(new TestLogger<TestLoggingDefinitions>()).GenerateMessage(),
                 loggerFactory.Log[0].Message);
         }
 
-        [Fact]
+        [ConditionalFact]
         public void Returns_different_provider_for_different_type_of_configured_extensions()
         {
             var loggerFactory = new ListLoggerFactory();
@@ -51,19 +53,19 @@ namespace Microsoft.EntityFrameworkCore
             Assert.Equal(2, loggerFactory.Log.Count);
 
             Assert.Equal(
-                CoreStrings.LogServiceProviderCreated.GenerateMessage(),
+                CoreResources.LogServiceProviderCreated(new TestLogger<TestLoggingDefinitions>()).GenerateMessage(),
                 loggerFactory.Log[0].Message);
 
             Assert.Equal(
-                CoreStrings.LogServiceProviderDebugInfo.GenerateMessage(
+                CoreResources.LogServiceProviderDebugInfo(new TestLogger<TestLoggingDefinitions>()).GenerateMessage(
                     string.Join(
                         ", ",
-                        CoreStrings.ServiceProviderConfigRemoved(typeof(FakeDbContextOptionsExtension1).DisplayName()),
-                        CoreStrings.ServiceProviderConfigAdded(typeof(FakeDbContextOptionsExtension2).DisplayName()))),
+                        CoreStrings.ServiceProviderConfigRemoved("Fake1"),
+                        CoreStrings.ServiceProviderConfigAdded("Fake2"))),
                 loggerFactory.Log[1].Message);
         }
 
-        [Fact]
+        [ConditionalFact]
         public void Returns_same_provider_for_same_type_of_configured_extensions_and_replaced_service_types()
         {
             var loggerFactory = new ListLoggerFactory();
@@ -82,14 +84,14 @@ namespace Microsoft.EntityFrameworkCore
 
             Assert.Same(cache.GetOrAdd(config1, true), cache.GetOrAdd(config2, true));
 
-            Assert.Equal(1, loggerFactory.Log.Count);
+            Assert.Single(loggerFactory.Log);
 
             Assert.Equal(
-                CoreStrings.LogServiceProviderCreated.GenerateMessage(),
+                CoreResources.LogServiceProviderCreated(new TestLogger<TestLoggingDefinitions>()).GenerateMessage(),
                 loggerFactory.Log[0].Message);
         }
 
-        [Fact]
+        [ConditionalFact]
         public void Returns_different_provider_for_different_replaced_service_types()
         {
             var loggerFactory = new ListLoggerFactory();
@@ -114,17 +116,17 @@ namespace Microsoft.EntityFrameworkCore
             Assert.Equal(2, loggerFactory.Log.Count);
 
             Assert.Equal(
-                CoreStrings.LogServiceProviderCreated.GenerateMessage(),
+                CoreResources.LogServiceProviderCreated(new TestLogger<TestLoggingDefinitions>()).GenerateMessage(),
                 loggerFactory.Log[0].Message);
 
             Assert.Equal(
-                CoreStrings.LogServiceProviderDebugInfo.GenerateMessage(
+                CoreResources.LogServiceProviderDebugInfo(new TestLogger<TestLoggingDefinitions>()).GenerateMessage(
                     CoreStrings.ServiceProviderConfigChanged("Core:ReplaceService:" + typeof(object).DisplayName())),
                 loggerFactory.Log[1].Message);
         }
 
-        [Fact]
-        public void Reports_debug_info_for_different_ILoggerFactory_instances()
+        [ConditionalFact]
+        public void Different_ILoggerFactory_instances_does_not_trigger_new_internal_provider()
         {
             var config1 = CreateOptions<CoreOptionsExtension>(new ListLoggerFactory());
 
@@ -137,17 +139,10 @@ namespace Microsoft.EntityFrameworkCore
             var first = cache.GetOrAdd(config1, true);
             var second = cache.GetOrAdd(config2, true);
 
-            Assert.NotSame(first, second);
-
-            Assert.Equal(1, loggerFactory.Log.Count);
-
-            Assert.Equal(
-                CoreStrings.LogServiceProviderDebugInfo.GenerateMessage(
-                    CoreStrings.ServiceProviderConfigChanged("Core:UseLoggerFactory")),
-                loggerFactory.Log[0].Message);
+            Assert.Same(first, second);
         }
 
-        [Fact]
+        [ConditionalFact]
         public void Reports_debug_info_for_most_similar_existing_service_provider()
         {
             // Do this a bunch of times since in the past this exposed issues with cache collisions
@@ -194,21 +189,21 @@ namespace Microsoft.EntityFrameworkCore
                 Assert.Equal(4, loggerFactory.Log.Count);
 
                 Assert.Equal(
-                    CoreStrings.LogServiceProviderCreated.GenerateMessage(),
+                    CoreResources.LogServiceProviderCreated(new TestLogger<TestLoggingDefinitions>()).GenerateMessage(),
                     loggerFactory.Log[0].Message);
 
                 Assert.Equal(
-                    CoreStrings.LogServiceProviderDebugInfo.GenerateMessage(
+                    CoreResources.LogServiceProviderDebugInfo(new TestLogger<TestLoggingDefinitions>()).GenerateMessage(
                         CoreStrings.ServiceProviderConfigChanged("Core:ConfigureWarnings")),
                     loggerFactory.Log[1].Message);
 
                 Assert.Equal(
-                    CoreStrings.LogServiceProviderDebugInfo.GenerateMessage(
+                    CoreResources.LogServiceProviderDebugInfo(new TestLogger<TestLoggingDefinitions>()).GenerateMessage(
                         CoreStrings.ServiceProviderConfigChanged("Core:EnableSensitiveDataLogging")),
                     loggerFactory.Log[2].Message);
 
                 Assert.Equal(
-                    CoreStrings.LogServiceProviderDebugInfo.GenerateMessage(
+                    CoreResources.LogServiceProviderDebugInfo(new TestLogger<TestLoggingDefinitions>()).GenerateMessage(
                         string.Join(
                             ", ",
                             CoreStrings.ServiceProviderConfigChanged("Core:EnableDetailedErrors"),
@@ -223,34 +218,81 @@ namespace Microsoft.EntityFrameworkCore
             var optionsBuilder = new DbContextOptionsBuilder();
             ((IDbContextOptionsBuilderInfrastructure)optionsBuilder).AddOrUpdateExtension(new TExtension());
             optionsBuilder.UseLoggerFactory(loggerFactory);
+            optionsBuilder.UseInMemoryDatabase(Guid.NewGuid().ToString());
 
             return optionsBuilder.Options;
         }
 
         private class FakeDbContextOptionsExtension1 : IDbContextOptionsExtension
         {
-            public virtual bool ApplyServices(IServiceCollection services) => false;
+            private DbContextOptionsExtensionInfo _info;
 
-            public virtual long GetServiceProviderHashCode() => 0;
+            public string Something { get; set; }
+
+            public DbContextOptionsExtensionInfo Info
+                => _info ??= new ExtensionInfo(this);
+
+            public virtual void ApplyServices(IServiceCollection services)
+            {
+            }
 
             public virtual void Validate(IDbContextOptions options)
             {
             }
 
-            public virtual string LogFragment => "";
+            private sealed class ExtensionInfo : DbContextOptionsExtensionInfo
+            {
+                public ExtensionInfo(IDbContextOptionsExtension extension)
+                    : base(extension)
+                {
+                }
+
+                public override bool IsDatabaseProvider => false;
+
+                public override long GetServiceProviderHashCode() => 0;
+
+                public override string LogFragment => "";
+
+                public override void PopulateDebugInfo(IDictionary<string, string> debugInfo)
+                {
+                    debugInfo["Fake1"] = "1";
+                }
+            }
         }
 
         private class FakeDbContextOptionsExtension2 : IDbContextOptionsExtension
         {
-            public virtual bool ApplyServices(IServiceCollection services) => false;
+            private DbContextOptionsExtensionInfo _info;
 
-            public virtual long GetServiceProviderHashCode() => 0;
+            public DbContextOptionsExtensionInfo Info
+                => _info ??= new ExtensionInfo(this);
+
+            public virtual void ApplyServices(IServiceCollection services)
+            {
+            }
 
             public virtual void Validate(IDbContextOptions options)
             {
             }
 
-            public virtual string LogFragment => "";
+            private sealed class ExtensionInfo : DbContextOptionsExtensionInfo
+            {
+                public ExtensionInfo(IDbContextOptionsExtension extension)
+                    : base(extension)
+                {
+                }
+
+                public override bool IsDatabaseProvider => false;
+
+                public override long GetServiceProviderHashCode() => 0;
+
+                public override string LogFragment => "";
+
+                public override void PopulateDebugInfo(IDictionary<string, string> debugInfo)
+                {
+                    debugInfo["Fake2"] = "1";
+                }
+            }
         }
     }
 }

@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Internal;
 using Xunit;
 
@@ -11,12 +12,13 @@ namespace Microsoft.EntityFrameworkCore.Utilities
 {
     public class TypeNameHelperTest
     {
-        [Theory]
+        [ConditionalTheory]
         // Predefined Types
         [InlineData(typeof(int), "int")]
         [InlineData(typeof(List<int>), "System.Collections.Generic.List<int>")]
         [InlineData(typeof(Dictionary<int, string>), "System.Collections.Generic.Dictionary<int, string>")]
-        [InlineData(typeof(Dictionary<int, List<string>>), "System.Collections.Generic.Dictionary<int, System.Collections.Generic.List<string>>")]
+        [InlineData(
+            typeof(Dictionary<int, List<string>>), "System.Collections.Generic.Dictionary<int, System.Collections.Generic.List<string>>")]
         [InlineData(typeof(List<List<string>>), "System.Collections.Generic.List<System.Collections.Generic.List<string>>")]
         // Classes inside NonGeneric class
         [InlineData(
@@ -61,7 +63,7 @@ namespace Microsoft.EntityFrameworkCore.Utilities
             Assert.Equal(expected, type.DisplayName());
         }
 
-        [Theory]
+        [ConditionalTheory]
         // Predefined Types
         [InlineData(typeof(int), "int")]
         [InlineData(typeof(List<int>), "List<int>")]
@@ -80,13 +82,14 @@ namespace Microsoft.EntityFrameworkCore.Utilities
         [InlineData(typeof(Outer<int>.F<int, string>), "F<int, string>")]
         [InlineData(typeof(Outer<int>.F<int, Outer<int>.E<string>>), "F<int, E<string>>")]
         [InlineData(typeof(Outer<int>.E<Outer<int>.E<string>>), "E<E<string>>")]
-        [InlineData(typeof(OuterGeneric<int>.InnerNonGeneric.InnerGeneric<int, string>.InnerGenericLeafNode<bool>), "InnerGenericLeafNode<bool>")]
+        [InlineData(
+            typeof(OuterGeneric<int>.InnerNonGeneric.InnerGeneric<int, string>.InnerGenericLeafNode<bool>), "InnerGenericLeafNode<bool>")]
         public void Can_pretty_print_CLR_name(Type type, string expected)
         {
             Assert.Equal(expected, type.ShortDisplayName());
         }
 
-        [Theory]
+        [ConditionalTheory]
         [InlineData(typeof(bool), "bool")]
         [InlineData(typeof(byte), "byte")]
         [InlineData(typeof(char), "char")]
@@ -108,7 +111,7 @@ namespace Microsoft.EntityFrameworkCore.Utilities
             Assert.Equal(expected, type.DisplayName());
         }
 
-        [Theory]
+        [ConditionalTheory]
         [InlineData(typeof(int[]), true, "int[]")]
         [InlineData(typeof(string[][]), true, "string[][]")]
         [InlineData(typeof(int[,]), true, "int[,]")]
@@ -121,7 +124,9 @@ namespace Microsoft.EntityFrameworkCore.Utilities
             Assert.Equal(expected, type.DisplayName(fullName));
         }
 
-        public static TheoryData GetOpenGenericsTestData()
+        public static TheoryData OpenGenericsTestData { get; } = CreateOpenGenericsTestData();
+
+        public static TheoryData CreateOpenGenericsTestData()
         {
             var openDictionaryType = typeof(Dictionary<,>);
             var genArgsDictionary = openDictionaryType.GetGenericArguments();
@@ -141,40 +146,43 @@ namespace Microsoft.EntityFrameworkCore.Utilities
                 { typeof(Dictionary<,>), false, "Dictionary<,>" },
                 { typeof(List<>), true, "System.Collections.Generic.List<>" },
                 { typeof(Dictionary<,>), true, "System.Collections.Generic.Dictionary<,>" },
-                { typeof(Level1<>.Level2<>.Level3<>), true, "Microsoft.EntityFrameworkCore.Utilities.TypeNameHelperTest+Level1<>+Level2<>+Level3<>" },
                 {
-                    typeof(PartiallyClosedGeneric<>).BaseType,
-                    true,
+                    typeof(Level1<>.Level2<>.Level3<>), true,
+                    "Microsoft.EntityFrameworkCore.Utilities.TypeNameHelperTest+Level1<>+Level2<>+Level3<>"
+                },
+                {
+                    typeof(PartiallyClosedGeneric<>).BaseType, true,
                     "Microsoft.EntityFrameworkCore.Utilities.TypeNameHelperTest+C<, int>"
                 },
                 {
-                    typeof(OuterGeneric<>.InnerNonGeneric.InnerGeneric<,>.InnerGenericLeafNode<>),
-                    true,
+                    typeof(OuterGeneric<>.InnerNonGeneric.InnerGeneric<,>.InnerGenericLeafNode<>), true,
                     "Microsoft.EntityFrameworkCore.Utilities.TypeNameHelperTest+OuterGeneric<>+InnerNonGeneric+InnerGeneric<,>+InnerGenericLeafNode<>"
                 },
                 {
-                    closedDictionaryType,
-                    true,
+                    closedDictionaryType, true,
                     "System.Collections.Generic.Dictionary<Microsoft.EntityFrameworkCore.Utilities.TypeNameHelperTest+B<>,>"
                 },
                 {
-                    closedLevelType,
-                    true,
-                    "Microsoft.EntityFrameworkCore.Utilities.TypeNameHelperTest+Level1<>+Level2<string>+Level3<>"
+                    closedLevelType, true, "Microsoft.EntityFrameworkCore.Utilities.TypeNameHelperTest+Level1<>+Level2<string>+Level3<>"
                 },
                 {
-                    closedInnerType,
-                    true,
+                    closedInnerType, true,
                     "Microsoft.EntityFrameworkCore.Utilities.TypeNameHelperTest+OuterGeneric<>+InnerNonGeneric+InnerGeneric<,>+InnerGenericLeafNode<bool>"
                 }
             };
         }
 
-        [Theory]
-        [MemberData(nameof(GetOpenGenericsTestData))]
-        public void Can_pretty_print_open_generics(Type type, bool fullName, string expected)
+        [ConditionalFact]
+        public void Can_pretty_print_open_generics()
         {
-            Assert.Equal(expected, type.DisplayName(fullName));
+            foreach (var testData in OpenGenericsTestData)
+            {
+                var type = (Type)testData[0];
+                var fullName = (bool)testData[1];
+                var expected = (string)testData[2];
+
+                Assert.Equal(expected, type.DisplayName(fullName));
+            }
         }
 
         private class A

@@ -6,48 +6,61 @@ using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Diagnostics;
 using System.Linq;
-using Microsoft.EntityFrameworkCore.Diagnostics;
+using System.Reflection;
+using Microsoft.EntityFrameworkCore.Diagnostics.Internal;
 using Microsoft.EntityFrameworkCore.Internal;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Metadata.Conventions;
+using Microsoft.EntityFrameworkCore.Metadata.Conventions.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using Microsoft.EntityFrameworkCore.TestUtilities;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Xunit;
 
+// ReSharper disable MemberHidesStaticFromOuterClass
 namespace Microsoft.EntityFrameworkCore.Infrastructure
 {
     public abstract class ModelValidatorTestBase
     {
-        protected virtual void SetBaseType(EntityType entityType, EntityType baseEntityType) => entityType.HasBaseType(baseEntityType);
+        protected virtual void SetBaseType(IMutableEntityType entityType, IMutableEntityType baseEntityType)
+            => entityType.BaseType = baseEntityType;
 
-        protected Key CreateKey(EntityType entityType, int startingPropertyIndex = -1, int propertyCount = 1)
+        protected IMutableKey CreateKey(IMutableEntityType entityType, int startingPropertyIndex = -1, int propertyCount = 1)
         {
             if (startingPropertyIndex == -1)
             {
-                startingPropertyIndex = entityType.PropertyCount() - 1;
+                startingPropertyIndex = entityType.GetProperties().Count() - 1;
             }
 
-            var keyProperties = new Property[propertyCount];
+            var keyProperties = new IMutableProperty[propertyCount];
             for (var i = 0; i < propertyCount; i++)
             {
-                var property = entityType.GetOrAddProperty("P" + (startingPropertyIndex + i), typeof(int?));
-                keyProperties[i] = property;
+                var propertyName = "P" + (startingPropertyIndex + i);
+                keyProperties[i] = entityType.FindProperty(propertyName)
+                    ?? entityType.AddProperty(propertyName, typeof(int?));
                 keyProperties[i].IsNullable = false;
             }
 
             return entityType.AddKey(keyProperties);
         }
 
-        public void SetPrimaryKey(EntityType entityType)
+        public void AddProperties(IMutableEntityType entityTypeA)
         {
-            var property = entityType.AddProperty("Id", typeof(int));
-            entityType.SetPrimaryKey(property);
+            entityTypeA.AddProperty(nameof(A.P0), typeof(int?));
+            entityTypeA.AddProperty(nameof(A.P1), typeof(int?));
+            entityTypeA.AddProperty(nameof(A.P2), typeof(int?));
+            entityTypeA.AddProperty(nameof(A.P3), typeof(int?));
         }
 
-        protected ForeignKey CreateForeignKey(Key dependentKey, Key principalKey)
+        public void SetPrimaryKey(IMutableEntityType entityType)
+            => entityType.SetPrimaryKey(entityType.AddProperty("Id", typeof(int)));
+
+        protected IMutableForeignKey CreateForeignKey(IMutableKey dependentKey, IMutableKey principalKey)
             => CreateForeignKey(dependentKey.DeclaringEntityType, dependentKey.Properties, principalKey);
 
-        protected ForeignKey CreateForeignKey(EntityType dependEntityType, IReadOnlyList<Property> dependentProperties, Key principalKey)
+        protected IMutableForeignKey CreateForeignKey(
+            IMutableEntityType dependEntityType, IReadOnlyList<IMutableProperty> dependentProperties, IMutableKey principalKey)
         {
             var foreignKey = dependEntityType.AddForeignKey(dependentProperties, principalKey, principalKey.DeclaringEntityType);
             foreignKey.IsUnique = true;
@@ -125,6 +138,22 @@ namespace Microsoft.EntityFrameworkCore.Infrastructure
             public int SampleEntityId { get; set; }
         }
 
+        public class SampleEntityMinimal
+        {
+            public int Id { get; set; }
+            public ReferencedEntityMinimal ReferencedEntity { get; set; }
+        }
+
+        public class ReferencedEntityMinimal
+        {
+        }
+
+        public class AnotherSampleEntityMinimal
+        {
+            public int Id { get; set; }
+            public ReferencedEntityMinimal ReferencedEntity { get; set; }
+        }
+
         protected class E
         {
             public int Id { get; set; }
@@ -136,6 +165,7 @@ namespace Microsoft.EntityFrameworkCore.Infrastructure
         protected class EntityWithInvalidProperties
         {
             public int Id { get; set; }
+
             public bool NotImplemented
             {
                 get => throw new NotImplementedException();
@@ -164,20 +194,61 @@ namespace Microsoft.EntityFrameworkCore.Infrastructure
             }
         }
 
-        protected ModelValidatorTestBase()
+        protected class Customer
         {
-            LoggerFactory = new ListLoggerFactory(l => l == DbLoggerCategory.Model.Validation.Name || l == DbLoggerCategory.Model.Name);
-            ValidationLogger = CreateValidationLogger();
-            ModelLogger = CreateModelLogger();
+            public int Id { get; set; }
+            public string Name { get; set; }
+            public string PartitionId { get; set; }
+            public ICollection<Order> Orders { get; set; }
         }
+
+        protected class Order
+        {
+            public static readonly PropertyInfo IdProperty = typeof(Order).GetProperty(nameof(Id));
+
+            public int Id { get; set; }
+            public string PartitionId { get; set; }
+            public Customer Customer { get; set; }
+
+            public OrderDetails OrderDetails { get; set; }
+
+            [NotMapped]
+            public virtual ICollection<Product> Products { get; set; }
+        }
+
+        [Owned]
+        protected class OrderDetails
+        {
+            public string ShippingAddress { get; set; }
+        }
+
+        protected class OrderProduct
+        {
+            public static readonly PropertyInfo OrderIdProperty = typeof(OrderProduct).GetProperty(nameof(OrderId));
+            public static readonly PropertyInfo ProductIdProperty = typeof(OrderProduct).GetProperty(nameof(ProductId));
+
+            public int OrderId { get; set; }
+            public int ProductId { get; set; }
+            public virtual Order Order { get; set; }
+            public virtual Product Product { get; set; }
+        }
+
+        protected class Product
+        {
+            public static readonly PropertyInfo IdProperty = typeof(Product).GetProperty(nameof(Id));
+
+            public int Id { get; set; }
+
+            [NotMapped]
+            public virtual ICollection<Order> Orders { get; set; }
+        }
+
+        protected ModelValidatorTestBase()
+            => LoggerFactory = new ListLoggerFactory(l => l == DbLoggerCategory.Model.Validation.Name || l == DbLoggerCategory.Model.Name);
 
         protected ListLoggerFactory LoggerFactory { get; }
 
-        protected IDiagnosticsLogger<DbLoggerCategory.Model.Validation> ValidationLogger { get; set; }
-
-        protected IDiagnosticsLogger<DbLoggerCategory.Model> ModelLogger { get; set; }
-
-        protected virtual void VerifyWarning(string expectedMessage, IModel model, LogLevel level = LogLevel.Warning)
+        protected virtual void VerifyWarning(string expectedMessage, IMutableModel model, LogLevel level = LogLevel.Warning)
         {
             Validate(model);
 
@@ -185,17 +256,35 @@ namespace Microsoft.EntityFrameworkCore.Infrastructure
             Assert.Equal(expectedMessage, logEntry.Message);
         }
 
-        protected virtual void VerifyError(string expectedMessage, IModel model)
+        protected virtual void VerifyWarnings(string[] expectedMessages, IMutableModel model, LogLevel level = LogLevel.Warning)
         {
-            ((Model)model).Validate();
-            Assert.Equal(expectedMessage, Assert.Throws<InvalidOperationException>(() => Validate(model)).Message);
+            Validate(model);
+            var logEntries = LoggerFactory.Log.Where(l => l.Level == level);
+            Assert.Equal(expectedMessages.Length, logEntries.Count());
+
+            int count = 0;
+            foreach (var logEntry in logEntries)
+            {
+                Assert.Equal(expectedMessages[count++], logEntry.Message);
+            }
         }
 
-        protected virtual void Validate(IModel model)
+        protected virtual void VerifyError(string expectedMessage, IMutableModel model)
         {
-            ((Model)model).Validate();
-            CreateModelValidator().Validate(model);
+            var message = Assert.Throws<InvalidOperationException>(() => Validate(model)).Message;
+            Assert.Equal(expectedMessage, message);
         }
+
+        protected virtual void VerifyLogDoesNotContain(string expectedMessage, IMutableModel model)
+        {
+            Validate(model);
+
+            var logEntries = LoggerFactory.Log.Where(l => l.Message.Contains(expectedMessage));
+
+            Assert.Empty(logEntries);
+        }
+
+        protected virtual IModel Validate(IMutableModel model) => model.FinalizeModel();
 
         protected DiagnosticsLogger<DbLoggerCategory.Model.Validation> CreateValidationLogger(bool sensitiveDataLoggingEnabled = false)
         {
@@ -204,7 +293,9 @@ namespace Microsoft.EntityFrameworkCore.Infrastructure
             return new DiagnosticsLogger<DbLoggerCategory.Model.Validation>(
                 LoggerFactory,
                 options,
-                new DiagnosticListener("Fake"));
+                new DiagnosticListener("Fake"),
+                TestHelpers.LoggingDefinitions,
+                new NullDbContextLogger());
         }
 
         protected DiagnosticsLogger<DbLoggerCategory.Model> CreateModelLogger(bool sensitiveDataLoggingEnabled = false)
@@ -214,12 +305,33 @@ namespace Microsoft.EntityFrameworkCore.Infrastructure
             return new DiagnosticsLogger<DbLoggerCategory.Model>(
                 LoggerFactory,
                 options,
-                new DiagnosticListener("Fake"));
+                new DiagnosticListener("Fake"),
+                TestHelpers.LoggingDefinitions,
+                new NullDbContextLogger());
         }
 
-        protected abstract IModelValidator CreateModelValidator();
+        protected virtual ModelBuilder CreateConventionalModelBuilder(bool sensitiveDataLoggingEnabled = false)
+            => TestHelpers.CreateConventionBuilder(
+                CreateModelLogger(sensitiveDataLoggingEnabled), CreateValidationLogger(sensitiveDataLoggingEnabled));
 
-        protected virtual ModelBuilder CreateConventionalModelBuilder()
-            => InMemoryTestHelpers.Instance.CreateConventionBuilder();
+        protected virtual ModelBuilder CreateConventionlessModelBuilder(bool sensitiveDataLoggingEnabled = false)
+        {
+            var conventionSet = new ConventionSet();
+
+            var dependencies = CreateDependencies(sensitiveDataLoggingEnabled);
+            conventionSet.ModelFinalizingConventions.Add(new TypeMappingConvention(dependencies));
+            conventionSet.ModelFinalizedConventions.Add(new ValidatingConvention(dependencies));
+
+            return new ModelBuilder(conventionSet);
+        }
+
+        protected ProviderConventionSetBuilderDependencies CreateDependencies(bool sensitiveDataLoggingEnabled = false)
+            => TestHelpers.CreateContextServices().GetRequiredService<ProviderConventionSetBuilderDependencies>()
+                .With(CreateValidationLogger(sensitiveDataLoggingEnabled));
+
+        protected virtual TestHelpers TestHelpers => InMemoryTestHelpers.Instance;
+
+        protected virtual InternalModelBuilder CreateConventionlessInternalModelBuilder()
+            => (InternalModelBuilder)CreateConventionlessModelBuilder().GetInfrastructure();
     }
 }

@@ -5,7 +5,8 @@ using System;
 using System.Linq;
 using System.Linq.Expressions;
 using JetBrains.Annotations;
-using Microsoft.EntityFrameworkCore.Internal;
+using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion.Internal;
 using Microsoft.EntityFrameworkCore.Utilities;
 
@@ -38,7 +39,6 @@ namespace Microsoft.EntityFrameworkCore.Storage.ValueConversion
             [NotNull] LambdaExpression convertToProviderExpression,
             [NotNull] LambdaExpression convertFromProviderExpression,
             [CanBeNull] ConverterMappingHints mappingHints = null)
-
         {
             Check.NotNull(convertToProviderExpression, nameof(convertToProviderExpression));
             Check.NotNull(convertFromProviderExpression, nameof(convertFromProviderExpression));
@@ -144,7 +144,7 @@ namespace Microsoft.EntityFrameworkCore.Storage.ValueConversion
 
             var firstConverter
                 = ProviderClrType.IsNullableType()
-                  && !secondConverter.ModelClrType.IsNullableType()
+                && !secondConverter.ModelClrType.IsNullableType()
                     ? ComposeWith(
                         (ValueConverter)Activator.CreateInstance(
                             typeof(CastingConverter<,>).MakeGenericType(

@@ -6,7 +6,8 @@ using Microsoft.EntityFrameworkCore.TestUtilities;
 
 namespace Microsoft.EntityFrameworkCore
 {
-    public class ConvertToProviderTypesInMemoryTest : ConvertToProviderTypesTestBase<ConvertToProviderTypesInMemoryTest.ConvertToProviderTypesInMemoryFixture>
+    public class ConvertToProviderTypesInMemoryTest : ConvertToProviderTypesTestBase<
+        ConvertToProviderTypesInMemoryTest.ConvertToProviderTypesInMemoryFixture>
     {
         public ConvertToProviderTypesInMemoryTest(ConvertToProviderTypesInMemoryFixture fixture)
             : base(fixture)
@@ -26,6 +27,8 @@ namespace Microsoft.EntityFrameworkCore
             public override bool SupportsLargeStringComparisons => true;
 
             public override bool SupportsBinaryKeys => false;
+
+            public override bool SupportsDecimalComparisons => true;
 
             public override DateTime DefaultDateTime => new DateTime();
         }

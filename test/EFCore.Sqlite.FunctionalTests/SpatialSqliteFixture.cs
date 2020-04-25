@@ -7,7 +7,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Microsoft.EntityFrameworkCore
 {
-#if !Test21
     public class SpatialSqliteFixture : SpatialFixtureBase
     {
         protected override ITestStoreFactory TestStoreFactory
@@ -24,6 +23,13 @@ namespace Microsoft.EntityFrameworkCore
 
             return optionsBuilder;
         }
+
+        protected override void Clean(DbContext context)
+        {
+            context.Database.ExecuteSqlRaw("DROP VIEW IF EXISTS vector_layers");
+            context.Database.ExecuteSqlRaw("DROP VIEW IF EXISTS vector_layers_auth");
+            context.Database.ExecuteSqlRaw("DROP VIEW IF EXISTS vector_layers_statistics");
+            context.Database.ExecuteSqlRaw("DROP VIEW IF EXISTS vector_layers_field_infos");
+        }
     }
-#endif
 }

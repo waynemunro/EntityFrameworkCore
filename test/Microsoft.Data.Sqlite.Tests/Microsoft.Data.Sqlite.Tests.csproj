@@ -2,6 +2,7 @@
 
   <PropertyGroup>
     <TargetFrameworks>$(StandardTestTfms)</TargetFrameworks>
+    <DefineConstants>$(DefineConstants);E_SQLITE3</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>
@@ -9,7 +10,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="SQLitePCLRaw.bundle_green" Version="$(SQLitePCLRawBundleGreenPackageVersion)" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="$(SQLitePCLRawBundleESqlite3Version)" />
   </ItemGroup>
 
 </Project>

@@ -2,18 +2,17 @@
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System.Linq;
-using GeoAPI.Geometries;
 using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Query.Expressions;
+using Microsoft.EntityFrameworkCore.Query.SqlExpressions;
 using Microsoft.EntityFrameworkCore.Sqlite.Storage.Internal;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.TestModels.SpatialModel;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 using Microsoft.Extensions.DependencyInjection;
+using NetTopologySuite.Geometries;
 
 namespace Microsoft.EntityFrameworkCore.Query
 {
-#if !Test21
     public class SpatialQuerySqliteFixture : SpatialQueryRelationalFixture
     {
         protected override ITestStoreFactory TestStoreFactory
@@ -31,6 +30,7 @@ namespace Microsoft.EntityFrameworkCore.Query
 
             return optionsBuilder;
         }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder, DbContext context)
         {
             base.OnModelCreating(modelBuilder, context);
@@ -38,10 +38,21 @@ namespace Microsoft.EntityFrameworkCore.Query
             modelBuilder.HasDbFunction(
                 typeof(GeoExtensions).GetMethod(nameof(GeoExtensions.Distance)),
                 b => b.HasTranslation(
-                    e => new SqlFunctionExpression(
+                    e => SqlFunctionExpression.Create(
                         "Distance",
+                        arguments: e,
+                        nullable: true,
+                        argumentsPropagateNullability: e.Select(a => true).ToList(),
                         typeof(double),
-                        e)));
+                        null)));
+        }
+
+        protected override void Clean(DbContext context)
+        {
+            context.Database.ExecuteSqlRaw("DROP VIEW IF EXISTS vector_layers");
+            context.Database.ExecuteSqlRaw("DROP VIEW IF EXISTS vector_layers_auth");
+            context.Database.ExecuteSqlRaw("DROP VIEW IF EXISTS vector_layers_statistics");
+            context.Database.ExecuteSqlRaw("DROP VIEW IF EXISTS vector_layers_field_infos");
         }
 
         private class ReplacementTypeMappingSource : SqliteTypeMappingSource
@@ -55,11 +66,10 @@ namespace Microsoft.EntityFrameworkCore.Query
 
             protected override RelationalTypeMapping FindMapping(in RelationalTypeMappingInfo mappingInfo)
                 => mappingInfo.ClrType == typeof(GeoPoint)
-                    ? ((RelationalTypeMapping)base.FindMapping(typeof(IPoint))
+                    ? ((RelationalTypeMapping)base.FindMapping(typeof(Point))
                         .Clone(new GeoPointConverter()))
                     .Clone("geometry", null)
                     : base.FindMapping(mappingInfo);
         }
     }
-#endif
 }

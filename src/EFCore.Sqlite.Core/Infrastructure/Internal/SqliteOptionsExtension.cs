@@ -5,24 +5,26 @@ using System.Collections.Generic;
 using System.Text;
 using JetBrains.Annotations;
 using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Utilities;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Microsoft.EntityFrameworkCore.Sqlite.Infrastructure.Internal
 {
     /// <summary>
-    ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-    ///     directly from your code. This API may change or be removed in future releases.
+    ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+    ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+    ///     any release. You should only use it directly in your code with extreme caution and knowing that
+    ///     doing so can result in application failures when updating to a new Entity Framework Core release.
     /// </summary>
-    public class SqliteOptionsExtension : RelationalOptionsExtension, IDbContextOptionsExtensionWithDebugInfo
+    public class SqliteOptionsExtension : RelationalOptionsExtension
     {
-        private bool _enforceForeignKeys = true;
+        private DbContextOptionsExtensionInfo _info;
         private bool _loadSpatialite;
-        private string _logFragment;
 
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
         public SqliteOptionsExtension()
         {
@@ -31,51 +33,48 @@ namespace Microsoft.EntityFrameworkCore.Sqlite.Infrastructure.Internal
         // NB: When adding new options, make sure to update the copy ctor below.
 
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
         protected SqliteOptionsExtension([NotNull] SqliteOptionsExtension copyFrom)
             : base(copyFrom)
         {
-            _enforceForeignKeys = copyFrom._enforceForeignKeys;
             _loadSpatialite = copyFrom._loadSpatialite;
         }
 
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+        /// </summary>
+        public override DbContextOptionsExtensionInfo Info
+            => _info ??= new ExtensionInfo(this);
+
+        /// <summary>
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
         protected override RelationalOptionsExtension Clone()
             => new SqliteOptionsExtension(this);
 
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
-        /// </summary>
-        public virtual bool EnforceForeignKeys => _enforceForeignKeys;
-
-        /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
         public virtual bool LoadSpatialite => _loadSpatialite;
 
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
-        /// </summary>
-        public virtual SqliteOptionsExtension WithEnforceForeignKeys(bool enforceForeignKeys)
-        {
-            var clone = (SqliteOptionsExtension)Clone();
-
-            clone._enforceForeignKeys = enforceForeignKeys;
-
-            return clone;
-        }
-
-        /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
         public virtual SqliteOptionsExtension WithLoadSpatialite(bool loadSpatialite)
         {
@@ -87,56 +86,52 @@ namespace Microsoft.EntityFrameworkCore.Sqlite.Infrastructure.Internal
         }
 
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
-        public override bool ApplyServices(IServiceCollection services)
+        public override void ApplyServices(IServiceCollection services)
+            => services.AddEntityFrameworkSqlite();
+
+        private sealed class ExtensionInfo : RelationalExtensionInfo
         {
-            Check.NotNull(services, nameof(services));
+            private string _logFragment;
 
-            services.AddEntityFrameworkSqlite();
-
-            return true;
-        }
-
-        /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
-        /// </summary>
-        public virtual void PopulateDebugInfo(IDictionary<string, string> debugInfo)
-        {
-            debugInfo["Sqlite"] = "1";
-        }
-
-        /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
-        /// </summary>
-        public override string LogFragment
-        {
-            get
+            public ExtensionInfo(IDbContextOptionsExtension extension)
+                : base(extension)
             {
-                if (_logFragment == null)
-                {
-                    var builder = new StringBuilder();
-
-                    builder.Append(base.LogFragment);
-
-                    if (!_enforceForeignKeys)
-                    {
-                        builder.Append("SuppressForeignKeyEnforcement ");
-                    }
-
-                    if (_loadSpatialite)
-                    {
-                        builder.Append("LoadSpatialite ");
-                    }
-
-                    _logFragment = builder.ToString();
-                }
-
-                return _logFragment;
             }
+
+            private new SqliteOptionsExtension Extension
+                => (SqliteOptionsExtension)base.Extension;
+
+            public override bool IsDatabaseProvider => true;
+
+            public override string LogFragment
+            {
+                get
+                {
+                    if (_logFragment == null)
+                    {
+                        var builder = new StringBuilder();
+
+                        builder.Append(base.LogFragment);
+
+                        if (Extension._loadSpatialite)
+                        {
+                            builder.Append("LoadSpatialite ");
+                        }
+
+                        _logFragment = builder.ToString();
+                    }
+
+                    return _logFragment;
+                }
+            }
+
+            public override void PopulateDebugInfo(IDictionary<string, string> debugInfo)
+                => debugInfo["Sqlite"] = "1";
         }
     }
 }

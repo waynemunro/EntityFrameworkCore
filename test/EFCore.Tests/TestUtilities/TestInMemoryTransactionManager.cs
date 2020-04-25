@@ -33,7 +33,13 @@ namespace Microsoft.EntityFrameworkCore.TestUtilities
 
         public override void CommitTransaction() => CurrentTransaction.Commit();
 
+        public override Task CommitTransactionAsync(CancellationToken cancellationToken = default)
+            => CurrentTransaction.CommitAsync(cancellationToken);
+
         public override void RollbackTransaction() => CurrentTransaction.Rollback();
+
+        public override Task RollbackTransactionAsync(CancellationToken cancellationToken = default)
+            => CurrentTransaction.RollbackAsync(cancellationToken);
 
         public override void EnlistTransaction(Transaction transaction) => _enlistedTransaction = transaction;
 
@@ -61,6 +67,27 @@ namespace Microsoft.EntityFrameworkCore.TestUtilities
             public void Rollback()
             {
                 TransactionManager._currentTransaction = null;
+            }
+
+            public Task CommitAsync(CancellationToken cancellationToken = default)
+            {
+                TransactionManager._currentTransaction = null;
+
+                return Task.CompletedTask;
+            }
+
+            public Task RollbackAsync(CancellationToken cancellationToken = default)
+            {
+                TransactionManager._currentTransaction = null;
+
+                return Task.CompletedTask;
+            }
+
+            public ValueTask DisposeAsync()
+            {
+                Dispose();
+
+                return default;
             }
         }
     }

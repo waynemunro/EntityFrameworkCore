@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System.Collections;
@@ -11,9 +11,10 @@ namespace Microsoft.EntityFrameworkCore.Tools.Commands
     // ReSharper disable once ArrangeTypeModifiers
     internal partial class MigrationsListCommand
     {
-        protected override int Execute()
+        protected override int Execute(string[] args)
         {
-            var migrations = CreateExecutor().GetMigrations(Context.Value()).ToList();
+            var migrations = CreateExecutor(args)
+                .GetMigrations(Context.Value()).ToList();
 
             if (_json.HasValue())
             {
@@ -24,7 +25,7 @@ namespace Microsoft.EntityFrameworkCore.Tools.Commands
                 ReportResults(migrations);
             }
 
-            return base.Execute();
+            return base.Execute(args);
         }
 
         private static void ReportJsonResults(IReadOnlyList<IDictionary> migrations)

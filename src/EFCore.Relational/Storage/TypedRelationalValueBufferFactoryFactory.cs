@@ -10,12 +10,12 @@ using System.Linq.Expressions;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using JetBrains.Annotations;
-using Microsoft.EntityFrameworkCore.Internal;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Metadata;
-using Microsoft.EntityFrameworkCore.Metadata.Internal;
+using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.Storage.Internal;
 using Microsoft.EntityFrameworkCore.Utilities;
-using Remotion.Linq.Parsing.ExpressionVisitors;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Microsoft.EntityFrameworkCore.Storage
 {
@@ -33,6 +33,11 @@ namespace Microsoft.EntityFrameworkCore.Storage
     ///         This type is typically used by database providers (and other extensions). It is generally
     ///         not used in application code.
     ///     </para>
+    ///     <para>
+    ///         The service lifetime is <see cref="ServiceLifetime.Singleton" />. This means a single instance
+    ///         is used by many <see cref="DbContext" /> instances. The implementation must be thread-safe.
+    ///         This service cannot depend on services registered as <see cref="ServiceLifetime.Scoped" />.
+    ///     </para>
     /// </summary>
     public class TypedRelationalValueBufferFactoryFactory : IRelationalValueBufferFactoryFactory
     {
@@ -42,15 +47,14 @@ namespace Microsoft.EntityFrameworkCore.Storage
         public static readonly ParameterExpression DataReaderParameter
             = Expression.Parameter(typeof(DbDataReader), "dataReader");
 
-        private static readonly MethodInfo _getFieldValueMethod
-            = typeof(DbDataReader).GetTypeInfo().GetDeclaredMethod(nameof(DbDataReader.GetFieldValue));
+        private static readonly MethodInfo _getFieldValueMethod =
+            typeof(DbDataReader).GetRuntimeMethod(nameof(DbDataReader.GetFieldValue), new[] { typeof(int) });
 
-        private static readonly MethodInfo _isDbNullMethod
-            = typeof(DbDataReader).GetTypeInfo().GetDeclaredMethod(nameof(DbDataReader.IsDBNull));
+        private static readonly MethodInfo _isDbNullMethod =
+            typeof(DbDataReader).GetRuntimeMethod(nameof(DbDataReader.IsDBNull), new[] { typeof(int) });
 
         private static readonly MethodInfo _throwReadValueExceptionMethod
-            = typeof(TypedRelationalValueBufferFactoryFactory).GetTypeInfo()
-                .GetDeclaredMethod(nameof(ThrowReadValueException));
+            = typeof(TypedRelationalValueBufferFactoryFactory).GetTypeInfo().GetDeclaredMethod(nameof(ThrowReadValueException));
 
         /// <summary>
         ///     Initializes a new instance of the <see cref="TypedRelationalValueBufferFactoryFactory" /> class.
@@ -82,38 +86,20 @@ namespace Microsoft.EntityFrameworkCore.Storage
                 => TypeMaterializationInfo.SequenceEqual(other.TypeMaterializationInfo);
 
             public override int GetHashCode()
-                => TypeMaterializationInfo.Aggregate(0, (t, v) => (t * 397) ^ v.GetHashCode());
+            {
+                var hash = new HashCode();
+                // ReSharper disable once ForCanBeConvertedToForeach
+                for (var i = 0; i < TypeMaterializationInfo.Count; i++)
+                {
+                    hash.Add(TypeMaterializationInfo[i]);
+                }
+
+                return hash.ToHashCode();
+            }
         }
 
         private readonly ConcurrentDictionary<CacheKey, TypedRelationalValueBufferFactory> _cache
             = new ConcurrentDictionary<CacheKey, TypedRelationalValueBufferFactory>();
-
-        /// <summary>
-        ///     Creates a new <see cref="IRelationalValueBufferFactory" />.
-        /// </summary>
-        /// <param name="valueTypes">
-        ///     The types of values to be returned from the value buffer.
-        /// </param>
-        /// <param name="indexMap">
-        ///     An ordered list of zero-based indexes to be read from the underlying result set (i.e. the first number in this
-        ///     list is the index of the underlying result set that will be returned when value 0 is requested from the
-        ///     value buffer).
-        /// </param>
-        /// <returns>
-        ///     The newly created <see cref="IRelationalValueBufferFactoryFactory" />.
-        /// </returns>
-        [Obsolete("Use Create(IReadOnlyList<TypeMaterializationInfo>).")]
-        public virtual IRelationalValueBufferFactory Create(
-            IReadOnlyList<Type> valueTypes, IReadOnlyList<int> indexMap)
-        {
-            Check.NotNull(valueTypes, nameof(valueTypes));
-
-            var mappingSource = Dependencies.TypeMappingSource;
-
-            return Create(
-                valueTypes.Select(
-                    (t, i) => new TypeMaterializationInfo(t, null, mappingSource, indexMap?[i] ?? -1)).ToList());
-        }
 
         /// <summary>
         ///     Creates a new <see cref="IRelationalValueBufferFactory" />.
@@ -132,15 +118,12 @@ namespace Microsoft.EntityFrameworkCore.Storage
         }
 
         /// <summary>
-        ///     Creates value buffer assignment expressions for the the given type information.
+        ///     Creates value buffer assignment expressions for the given type information.
         /// </summary>
         /// <param name="types"> Types and mapping for the values to be read. </param>
         /// <returns> The value buffer assignment expressions. </returns>
-        public virtual IReadOnlyList<Expression> CreateAssignmentExpressions(IReadOnlyList<TypeMaterializationInfo> types)
-        {
-            Check.NotNull(types, nameof(types));
-
-            return types
+        public virtual IReadOnlyList<Expression> CreateAssignmentExpressions([NotNull] IReadOnlyList<TypeMaterializationInfo> types)
+            => Check.NotNull(types, nameof(types))
                 .Select(
                     (mi, i) =>
                         CreateGetValueExpression(
@@ -149,7 +132,6 @@ namespace Microsoft.EntityFrameworkCore.Storage
                             mi,
                             Dependencies.CoreOptions.AreDetailedErrorsEnabled,
                             box: false)).ToArray();
-        }
 
         private static Func<DbDataReader, object[]> CreateArrayInitializer(CacheKey cacheKey, bool detailedErrorsEnabled)
             => Expression.Lambda<Func<DbDataReader, object[]>>(
@@ -182,7 +164,7 @@ namespace Microsoft.EntityFrameworkCore.Storage
 
                 message
                     = exception is NullReferenceException
-                      || Equals(value, DBNull.Value)
+                    || Equals(value, DBNull.Value)
                         ? CoreStrings.ErrorMaterializingPropertyNullReference(entityType, propertyName, expectedType)
                         : exception is InvalidCastException
                             ? CoreStrings.ErrorMaterializingPropertyInvalidCast(entityType, propertyName, expectedType, actualType)
@@ -268,7 +250,7 @@ namespace Microsoft.EntityFrameworkCore.Storage
                 valueExpression = Expression.TryCatch(valueExpression, catchBlock);
             }
 
-            if (box && valueExpression.Type.GetTypeInfo().IsValueType)
+            if (box && valueExpression.Type.IsValueType)
             {
                 valueExpression = Expression.Convert(valueExpression, typeof(object));
             }

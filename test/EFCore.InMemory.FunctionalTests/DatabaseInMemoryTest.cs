@@ -4,7 +4,6 @@
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore.TestUtilities;
-using Microsoft.EntityFrameworkCore.TestUtilities.Xunit;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Xunit;
@@ -19,13 +18,11 @@ namespace Microsoft.EntityFrameworkCore
         [InlineData(true)]
         public async Task CanConnect_returns_true(bool async)
         {
-            using (var context = new SimpleContext())
-            {
-                Assert.True(async ? await context.Database.CanConnectAsync() : context.Database.CanConnect());
-            }
+            using var context = new SimpleContext();
+            Assert.True(async ? await context.Database.CanConnectAsync() : context.Database.CanConnect());
         }
 
-        [Fact]
+        [ConditionalFact]
         public async Task Can_add_update_delete_end_to_end()
         {
             var serviceProvider = new ServiceCollection()
@@ -39,11 +36,7 @@ namespace Microsoft.EntityFrameworkCore
                 .UseInMemoryDatabase(nameof(DatabaseInMemoryTest))
                 .Options;
 
-            var customer = new Customer
-            {
-                Id = 42,
-                Name = "Theon"
-            };
+            var customer = new Customer { Id = 42, Name = "Theon" };
 
             using (var context = new DbContext(options))
             {
@@ -113,24 +106,20 @@ namespace Microsoft.EntityFrameworkCore
             modelBuilder.Entity<Customer>();
         }
 
-        [Fact]
+        [ConditionalFact]
         public async Task Can_share_instance_between_contexts_with_sugar_experience()
         {
             using (var db = new SimpleContext())
             {
                 db.Artists.Add(
-                    new SimpleContext.Artist
-                    {
-                        ArtistId = "JDId",
-                        Name = "John Doe"
-                    });
+                    new SimpleContext.Artist { ArtistId = "JDId", Name = "John Doe" });
                 await db.SaveChangesAsync();
             }
 
             using (var db = new SimpleContext())
             {
                 var data = db.Artists.ToList();
-                Assert.Equal(1, data.Count);
+                Assert.Single(data);
                 Assert.Equal("JDId", data[0].ArtistId);
                 Assert.Equal("John Doe", data[0].Name);
             }
@@ -142,7 +131,9 @@ namespace Microsoft.EntityFrameworkCore
             public DbSet<Artist> Artists { get; set; }
 
             protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-                => optionsBuilder.UseInMemoryDatabase(nameof(SimpleContext));
+                => optionsBuilder
+                    .UseInternalServiceProvider(InMemoryFixture.DefaultServiceProvider)
+                    .UseInMemoryDatabase(nameof(SimpleContext));
 
             protected override void OnModelCreating(ModelBuilder modelBuilder)
                 => modelBuilder.Entity<Artist>().HasKey(a => a.ArtistId);

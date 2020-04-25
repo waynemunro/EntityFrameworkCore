@@ -6,18 +6,27 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
-using System.Linq.Expressions;
 using JetBrains.Annotations;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.SqlServer.Internal;
 using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Microsoft.EntityFrameworkCore.SqlServer.Storage.Internal
 {
     /// <summary>
-    ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-    ///     directly from your code. This API may change or be removed in future releases.
+    ///     <para>
+    ///         This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+    ///         the same compatibility standards as public APIs. It may be changed or removed without notice in
+    ///         any release. You should only use it directly in your code with extreme caution and knowing that
+    ///         doing so can result in application failures when updating to a new Entity Framework Core release.
+    ///     </para>
+    ///     <para>
+    ///         The service lifetime is <see cref="ServiceLifetime.Singleton" />. This means a single instance
+    ///         is used by many <see cref="DbContext" /> instances. The implementation must be thread-safe.
+    ///         This service cannot depend on services registered as <see cref="ServiceLifetime.Scoped" />.
+    ///     </para>
     /// </summary>
     public class SqlServerTypeMappingSource : RelationalTypeMappingSource
     {
@@ -50,10 +59,13 @@ namespace Microsoft.EntityFrameworkCore.SqlServer.Storage.Internal
             = new IntTypeMapping("int", DbType.Int32);
 
         private readonly BoolTypeMapping _bool
-            = new BoolTypeMapping("bit");
+            = new SqlServerBoolTypeMapping("bit");
 
         private readonly SqlServerStringTypeMapping _fixedLengthUnicodeString
             = new SqlServerStringTypeMapping(unicode: true, fixedLength: true);
+
+        private readonly SqlServerStringTypeMapping _textUnicodeString
+            = new SqlServerStringTypeMapping("ntext", unicode: true, sqlDbType: SqlDbType.NText);
 
         private readonly SqlServerStringTypeMapping _variableLengthUnicodeString
             = new SqlServerStringTypeMapping(unicode: true);
@@ -64,6 +76,9 @@ namespace Microsoft.EntityFrameworkCore.SqlServer.Storage.Internal
         private readonly SqlServerStringTypeMapping _fixedLengthAnsiString
             = new SqlServerStringTypeMapping(fixedLength: true);
 
+        private readonly SqlServerStringTypeMapping _textAnsiString
+            = new SqlServerStringTypeMapping("text", sqlDbType: SqlDbType.Text);
+
         private readonly SqlServerStringTypeMapping _variableLengthAnsiString
             = new SqlServerStringTypeMapping();
 
@@ -72,6 +87,9 @@ namespace Microsoft.EntityFrameworkCore.SqlServer.Storage.Internal
 
         private readonly SqlServerByteArrayTypeMapping _variableLengthBinary
             = new SqlServerByteArrayTypeMapping();
+
+        private readonly SqlServerByteArrayTypeMapping _imageBinary
+            = new SqlServerByteArrayTypeMapping("image", sqlDbType: SqlDbType.Image);
 
         private readonly SqlServerByteArrayTypeMapping _variableLengthMaxBinary
             = new SqlServerByteArrayTypeMapping("varbinary(max)", storeTypePostfix: StoreTypePostfix.None);
@@ -98,7 +116,8 @@ namespace Microsoft.EntityFrameworkCore.SqlServer.Storage.Internal
             = new GuidTypeMapping("uniqueidentifier", DbType.Guid);
 
         private readonly DecimalTypeMapping _decimal
-            = new SqlServerDecimalTypeMapping("decimal(18, 2)", precision: 18, scale: 2, storeTypePostfix: StoreTypePostfix.PrecisionAndScale);
+            = new SqlServerDecimalTypeMapping(
+                "decimal(18, 2)", precision: 18, scale: 2, storeTypePostfix: StoreTypePostfix.PrecisionAndScale);
 
         private readonly DecimalTypeMapping _money
             = new SqlServerDecimalTypeMapping("money");
@@ -136,23 +155,16 @@ namespace Microsoft.EntityFrameworkCore.SqlServer.Storage.Internal
         private readonly IReadOnlyDictionary<string, Func<Type, RelationalTypeMapping>> _namedClrMappings
             = new Dictionary<string, Func<Type, RelationalTypeMapping>>(StringComparer.Ordinal)
             {
-                {
-                    "Microsoft.SqlServer.Types.SqlHierarchyId",
-                    t => SqlServerUdtTypeMapping.CreateSqlHierarchyIdMapping(t)
-                },
-                {
-                    "Microsoft.SqlServer.Types.SqlGeography",
-                    t => SqlServerUdtTypeMapping.CreateSqlSpatialMapping(t, "geography")
-                },
-                {
-                    "Microsoft.SqlServer.Types.SqlGeometry",
-                    t => SqlServerUdtTypeMapping.CreateSqlSpatialMapping(t, "geometry")
-                }
+                { "Microsoft.SqlServer.Types.SqlHierarchyId", t => SqlServerUdtTypeMapping.CreateSqlHierarchyIdMapping(t) },
+                { "Microsoft.SqlServer.Types.SqlGeography", t => SqlServerUdtTypeMapping.CreateSqlSpatialMapping(t, "geography") },
+                { "Microsoft.SqlServer.Types.SqlGeometry", t => SqlServerUdtTypeMapping.CreateSqlSpatialMapping(t, "geometry") }
             };
 
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
         public SqlServerTypeMappingSource(
             [NotNull] TypeMappingSourceDependencies dependencies,
@@ -195,14 +207,14 @@ namespace Microsoft.EntityFrameworkCore.SqlServer.Storage.Internal
                     { "decimal", _decimal },
                     { "double precision", _double },
                     { "float", _double },
-                    { "image", _variableLengthBinary },
+                    { "image", _imageBinary },
                     { "int", _int },
                     { "money", _money },
                     { "national char varying", _variableLengthUnicodeString },
                     { "national character varying", _variableLengthUnicodeString },
                     { "national character", _fixedLengthUnicodeString },
                     { "nchar", _fixedLengthUnicodeString },
-                    { "ntext", _variableLengthUnicodeString },
+                    { "ntext", _textUnicodeString },
                     { "numeric", _decimal },
                     { "nvarchar", _variableLengthUnicodeString },
                     { "nvarchar(max)", _variableLengthMaxUnicodeString },
@@ -212,7 +224,7 @@ namespace Microsoft.EntityFrameworkCore.SqlServer.Storage.Internal
                     { "smallint", _short },
                     { "smallmoney", _money },
                     { "sql_variant", _sqlVariant },
-                    { "text", _variableLengthAnsiString },
+                    { "text", _textAnsiString },
                     { "time", _time },
                     { "timestamp", _rowversion },
                     { "tinyint", _byte },
@@ -226,8 +238,10 @@ namespace Microsoft.EntityFrameworkCore.SqlServer.Storage.Internal
         }
 
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
         protected override void ValidateMapping(CoreTypeMapping mapping, IProperty property)
         {
@@ -245,8 +259,10 @@ namespace Microsoft.EntityFrameworkCore.SqlServer.Storage.Internal
         }
 
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
         protected override RelationalTypeMapping FindMapping(in RelationalTypeMappingInfo mappingInfo)
             => FindRawMapping(mappingInfo)?.Clone(mappingInfo)
@@ -273,9 +289,9 @@ namespace Microsoft.EntityFrameworkCore.SqlServer.Storage.Internal
                     || _storeTypeMappings.TryGetValue(storeTypeNameBase, out mapping))
                 {
                     return clrType == null
-                           || mapping.ClrType == clrType
-                        ? mapping
-                        : null;
+                        || mapping.ClrType == clrType
+                            ? mapping
+                            : null;
                 }
             }
 
@@ -303,12 +319,21 @@ namespace Microsoft.EntityFrameworkCore.SqlServer.Storage.Internal
                         size = isFixedLength ? maxSize : (int?)null;
                     }
 
-                    return size == null
-                        ? isAnsi ? _variableLengthMaxAnsiString : _variableLengthMaxUnicodeString
-                        : new SqlServerStringTypeMapping(
-                            unicode: !isAnsi,
-                            size: size,
-                            fixedLength: isFixedLength);
+                    if (size == null)
+                    {
+                        return isAnsi
+                            ? isFixedLength
+                                ? _fixedLengthAnsiString
+                                : _variableLengthMaxAnsiString
+                            : isFixedLength
+                                ? _fixedLengthUnicodeString
+                                : _variableLengthMaxUnicodeString;
+                    }
+
+                    return new SqlServerStringTypeMapping(
+                        unicode: !isAnsi,
+                        size: size,
+                        fixedLength: isFixedLength);
                 }
 
                 if (clrType == typeof(byte[]))
@@ -334,5 +359,17 @@ namespace Microsoft.EntityFrameworkCore.SqlServer.Storage.Internal
 
             return null;
         }
+
+        private static readonly List<string> _nameBasesUsingPrecision =
+            new List<string>() { "decimal", "dec", "numeric", "datetime2", "datetimeoffset" };
+
+        /// <summary>
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+        /// </summary>
+        protected override bool StoreTypeNameBaseUsesPrecision(string storeTypeNameBase)
+            => _nameBasesUsingPrecision.Contains(storeTypeNameBase);
     }
 }

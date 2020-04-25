@@ -14,7 +14,7 @@ namespace Microsoft.EntityFrameworkCore
 {
     public class SequentialGuidEndToEndTest : IDisposable
     {
-        [Fact]
+        [ConditionalFact]
         public async Task Can_use_sequential_GUID_end_to_end_async()
         {
             var serviceProvider = new ServiceCollection()
@@ -28,10 +28,7 @@ namespace Microsoft.EntityFrameworkCore
                 for (var i = 0; i < 50; i++)
                 {
                     context.Add(
-                        new Pegasus
-                        {
-                            Name = "Rainbow Dash " + i
-                        });
+                        new Pegasus { Name = "Rainbow Dash " + i });
                 }
 
                 await context.SaveChangesAsync();
@@ -48,7 +45,7 @@ namespace Microsoft.EntityFrameworkCore
             }
         }
 
-        [Fact]
+        [ConditionalFact]
         public async Task Can_use_explicit_values()
         {
             var serviceProvider = new ServiceCollection()

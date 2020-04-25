@@ -10,40 +10,30 @@ using Microsoft.EntityFrameworkCore.TestUtilities;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
+// ReSharper disable UnusedMember.Local
+// ReSharper disable InconsistentNaming
+// ReSharper disable CollectionNeverUpdated.Local
+// ReSharper disable UnusedAutoPropertyAccessor.Local
 namespace Microsoft.EntityFrameworkCore.ChangeTracking.Internal
 {
     public class NavigationFixerTest
     {
-        [Fact]
+        [ConditionalFact]
         public void Does_not_throw_if_Add_during_fixup()
         {
-            using (var context = new FixupContext())
-            {
-                var blog1 = new Blog
-                {
-                    Id = 1
-                };
-                var blog2 = new Blog
-                {
-                    Id = 2
-                };
+            using var context = new FixupContext();
+            var blog1 = new Blog { Id = 1 };
+            var blog2 = new Blog { Id = 2 };
 
-                var post1 = context.Add(
-                    new Post
-                    {
-                        BlogId = 2
-                    }).Entity;
+            var post1 = context.Add(
+                new Post { BlogId = 2 }).Entity;
 
-                blog1.Posts.Add(post1);
-                blog1.Posts.Add(
-                    new Post
-                    {
-                        BlogId = 2
-                    });
+            blog1.Posts.Add(post1);
+            blog1.Posts.Add(
+                new Post { BlogId = 2 });
 
-                context.Add(blog2);
-                context.Add(blog1);
-            }
+            context.Add(blog2);
+            context.Add(blog1);
         }
 
         private class FixupContext : DbContext
@@ -52,7 +42,9 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking.Internal
             public DbSet<Post> Posts { get; set; }
 
             protected internal override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-                => optionsBuilder.UseInMemoryDatabase(typeof(FixupContext).FullName);
+                => optionsBuilder
+                    .UseInternalServiceProvider(InMemoryFixture.DefaultServiceProvider)
+                    .UseInMemoryDatabase(typeof(FixupContext).FullName);
         }
 
         private class Blog
@@ -78,25 +70,15 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking.Internal
             }
         }
 
-        [Fact]
+        [ConditionalFact]
         public void Does_fixup_of_related_principals()
         {
             var contextServices = CreateContextServices();
             var manager = contextServices.GetRequiredService<IStateManager>();
 
-            var principal1 = new Category
-            {
-                Id = 11
-            };
-            var principal2 = new Category
-            {
-                Id = 12
-            };
-            var dependent = new Product
-            {
-                Id = 21,
-                CategoryId = 12
-            };
+            var principal1 = new Category { Id = 11 };
+            var principal2 = new Category { Id = 12 };
+            var dependent = new Product { Id = 21, CategoryId = 12 };
 
             manager.StartTracking(manager.GetOrCreateEntry(principal1));
             manager.StartTracking(manager.GetOrCreateEntry(principal2));
@@ -110,32 +92,17 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking.Internal
             Assert.DoesNotContain(dependent, principal1.Products);
         }
 
-        [Fact]
+        [ConditionalFact]
         public void Does_fixup_of_related_dependents()
         {
             var contextServices = CreateContextServices();
             var manager = contextServices.GetRequiredService<IStateManager>();
 
-            var dependent1 = new Product
-            {
-                Id = 21,
-                CategoryId = 11
-            };
-            var dependent2 = new Product
-            {
-                Id = 22,
-                CategoryId = 12
-            };
-            var dependent3 = new Product
-            {
-                Id = 23,
-                CategoryId = 11
-            };
+            var dependent1 = new Product { Id = 21, CategoryId = 11 };
+            var dependent2 = new Product { Id = 22, CategoryId = 12 };
+            var dependent3 = new Product { Id = 23, CategoryId = 11 };
 
-            var principal = new Category
-            {
-                Id = 11
-            };
+            var principal = new Category { Id = 11 };
 
             manager.StartTracking(manager.GetOrCreateEntry(dependent1));
             manager.StartTracking(manager.GetOrCreateEntry(dependent2));
@@ -155,37 +122,19 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking.Internal
             Assert.Contains(dependent3, principal.Products);
         }
 
-        [Fact]
+        [ConditionalFact]
         public void Does_fixup_of_one_to_one_relationship()
         {
             var contextServices = CreateContextServices();
             var manager = contextServices.GetRequiredService<IStateManager>();
 
-            var principal1 = new Product
-            {
-                Id = 21
-            };
-            var principal2 = new Product
-            {
-                Id = 22
-            };
-            var principal3 = new Product
-            {
-                Id = 23
-            };
+            var principal1 = new Product { Id = 21 };
+            var principal2 = new Product { Id = 22 };
+            var principal3 = new Product { Id = 23 };
 
-            var dependent1 = new ProductDetail
-            {
-                Id = 21
-            };
-            var dependent2 = new ProductDetail
-            {
-                Id = 22
-            };
-            var dependent4 = new ProductDetail
-            {
-                Id = 24
-            };
+            var dependent1 = new ProductDetail { Id = 21 };
+            var dependent2 = new ProductDetail { Id = 22 };
+            var dependent4 = new ProductDetail { Id = 24 };
 
             var principalEntry1 = manager.StartTracking(manager.GetOrCreateEntry(principal1));
             var principalEntry2 = manager.StartTracking(manager.GetOrCreateEntry(principal2));
@@ -221,26 +170,15 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking.Internal
             Assert.Null(dependent4.Product);
         }
 
-        [Fact]
+        [ConditionalFact]
         public void Does_fixup_of_one_to_one_self_referencing_relationship()
         {
             var contextServices = CreateContextServices();
             var manager = contextServices.GetRequiredService<IStateManager>();
 
-            var entity1 = new Product
-            {
-                Id = 21,
-                AlternateProductId = 22
-            };
-            var entity2 = new Product
-            {
-                Id = 22,
-                AlternateProductId = 23
-            };
-            var entity3 = new Product
-            {
-                Id = 23
-            };
+            var entity1 = new Product { Id = 21, AlternateProductId = 22 };
+            var entity2 = new Product { Id = 22, AlternateProductId = 23 };
+            var entity3 = new Product { Id = 23 };
 
             var entry1 = manager.StartTracking(manager.GetOrCreateEntry(entity1));
             var entry2 = manager.StartTracking(manager.GetOrCreateEntry(entity2));
@@ -278,25 +216,15 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking.Internal
             Assert.Same(entity2, entity3.OriginalProduct);
         }
 
-        [Fact]
+        [ConditionalFact]
         public void Does_fixup_of_FKs_and_related_principals_using_dependent_navigations()
         {
             var contextServices = CreateContextServices();
             var manager = contextServices.GetRequiredService<IStateManager>();
 
-            var principal1 = new Category
-            {
-                Id = 11
-            };
-            var principal2 = new Category
-            {
-                Id = 12
-            };
-            var dependent = new Product
-            {
-                Id = 21,
-                Category = principal2
-            };
+            var principal1 = new Category { Id = 11 };
+            var principal2 = new Category { Id = 12 };
+            var dependent = new Product { Id = 21, Category = principal2 };
 
             manager.StartTracking(manager.GetOrCreateEntry(principal1));
             manager.StartTracking(manager.GetOrCreateEntry(principal2));
@@ -311,24 +239,15 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking.Internal
             Assert.DoesNotContain(dependent, principal1.Products);
         }
 
-        [Fact]
+        [ConditionalFact]
         public void Does_fixup_of_FKs_and_related_principals_using_principal_navigations()
         {
             var contextServices = CreateContextServices();
             var manager = contextServices.GetRequiredService<IStateManager>();
 
-            var principal1 = new Category
-            {
-                Id = 11
-            };
-            var principal2 = new Category
-            {
-                Id = 12
-            };
-            var dependent = new Product
-            {
-                Id = 21
-            };
+            var principal1 = new Category { Id = 11 };
+            var principal2 = new Category { Id = 12 };
+            var dependent = new Product { Id = 21 };
 
             principal2.Products.Add(dependent);
 
@@ -345,31 +264,17 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking.Internal
             Assert.DoesNotContain(dependent, principal1.Products);
         }
 
-        [Fact]
+        [ConditionalFact]
         public void Does_fixup_of_FKs_and_related_dependents_using_dependent_navigations()
         {
             var contextServices = CreateContextServices();
             var manager = contextServices.GetRequiredService<IStateManager>();
 
-            var principal = new Category
-            {
-                Id = 11
-            };
+            var principal = new Category { Id = 11 };
 
-            var dependent1 = new Product
-            {
-                Id = 21,
-                Category = principal
-            };
-            var dependent2 = new Product
-            {
-                Id = 22
-            };
-            var dependent3 = new Product
-            {
-                Id = 23,
-                Category = principal
-            };
+            var dependent1 = new Product { Id = 21, Category = principal };
+            var dependent2 = new Product { Id = 22 };
+            var dependent3 = new Product { Id = 23, Category = principal };
 
             manager.StartTracking(manager.GetOrCreateEntry(dependent1)).SetEntityState(EntityState.Added);
             manager.StartTracking(manager.GetOrCreateEntry(dependent2)).SetEntityState(EntityState.Added);
@@ -392,29 +297,17 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking.Internal
             Assert.Contains(dependent3, principal.Products);
         }
 
-        [Fact]
+        [ConditionalFact]
         public void Does_fixup_of_FKs_and_related_dependents_using_principal_navigations()
         {
             var contextServices = CreateContextServices();
             var manager = contextServices.GetRequiredService<IStateManager>();
 
-            var principal = new Category
-            {
-                Id = 11
-            };
+            var principal = new Category { Id = 11 };
 
-            var dependent1 = new Product
-            {
-                Id = 21
-            };
-            var dependent2 = new Product
-            {
-                Id = 22
-            };
-            var dependent3 = new Product
-            {
-                Id = 23
-            };
+            var dependent1 = new Product { Id = 21 };
+            var dependent2 = new Product { Id = 22 };
+            var dependent3 = new Product { Id = 23 };
 
             principal.Products.Add(dependent1);
             principal.Products.Add(dependent3);
@@ -440,24 +333,15 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking.Internal
             Assert.Contains(dependent3, principal.Products);
         }
 
-        [Fact]
+        [ConditionalFact]
         public void Does_fixup_of_one_to_one_self_referencing_relationship_using_dependent_navigations()
         {
             var contextServices = CreateContextServices();
             var manager = contextServices.GetRequiredService<IStateManager>();
 
-            var entity1 = new Product
-            {
-                Id = 21
-            };
-            var entity2 = new Product
-            {
-                Id = 22
-            };
-            var entity3 = new Product
-            {
-                Id = 23
-            };
+            var entity1 = new Product { Id = 21 };
+            var entity2 = new Product { Id = 22 };
+            var entity3 = new Product { Id = 23 };
 
             entity1.AlternateProduct = entity2;
             entity2.AlternateProduct = entity3;
@@ -510,24 +394,15 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking.Internal
             Assert.Null(entity3.OriginalProduct);
         }
 
-        [Fact]
+        [ConditionalFact]
         public void Does_fixup_of_one_to_one_self_referencing_relationship_using_principal_navigations()
         {
             var contextServices = CreateContextServices();
             var manager = contextServices.GetRequiredService<IStateManager>();
 
-            var entity1 = new Product
-            {
-                Id = 21
-            };
-            var entity2 = new Product
-            {
-                Id = 22
-            };
-            var entity3 = new Product
-            {
-                Id = 23
-            };
+            var entity1 = new Product { Id = 21 };
+            var entity2 = new Product { Id = 22 };
+            var entity3 = new Product { Id = 23 };
 
             entity2.OriginalProduct = entity1;
             entity3.OriginalProduct = entity2;
@@ -595,26 +470,16 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking.Internal
             Assert.Same(entity2, entity3.OriginalProduct);
         }
 
-        [Fact]
+        [ConditionalFact]
         public void Does_fixup_of_related_principals_when_FK_is_set()
         {
             var model = BuildModel();
             var contextServices = CreateContextServices(model);
             var manager = contextServices.GetRequiredService<IStateManager>();
 
-            var principal1 = new Category
-            {
-                Id = 11
-            };
-            var principal2 = new Category
-            {
-                Id = 12
-            };
-            var dependent = new Product
-            {
-                Id = 21,
-                CategoryId = 0
-            };
+            var principal1 = new Category { Id = 11 };
+            var principal2 = new Category { Id = 12 };
+            var dependent = new Product { Id = 21, CategoryId = 0 };
 
             manager.StartTracking(manager.GetOrCreateEntry(principal1));
             manager.StartTracking(manager.GetOrCreateEntry(principal2));
@@ -646,26 +511,16 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking.Internal
             Assert.DoesNotContain(dependent, principal2.Products);
         }
 
-        [Fact]
+        [ConditionalFact]
         public void Does_fixup_of_related_principals_when_FK_is_cleared()
         {
             var model = BuildModel();
             var contextServices = CreateContextServices(model);
             var manager = contextServices.GetRequiredService<IStateManager>();
 
-            var principal1 = new Category
-            {
-                Id = 11
-            };
-            var principal2 = new Category
-            {
-                Id = 12
-            };
-            var dependent = new Product
-            {
-                Id = 21,
-                CategoryId = 12
-            };
+            var principal1 = new Category { Id = 11 };
+            var principal2 = new Category { Id = 12 };
+            var dependent = new Product { Id = 21, CategoryId = 12 };
 
             manager.StartTracking(manager.GetOrCreateEntry(principal1));
             manager.StartTracking(manager.GetOrCreateEntry(principal2));
@@ -697,26 +552,16 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking.Internal
             Assert.DoesNotContain(dependent, principal1.Products);
         }
 
-        [Fact]
+        [ConditionalFact]
         public void Does_fixup_of_related_principals_when_FK_is_changed()
         {
             var model = BuildModel();
             var contextServices = CreateContextServices(model);
             var manager = contextServices.GetRequiredService<IStateManager>();
 
-            var principal1 = new Category
-            {
-                Id = 11
-            };
-            var principal2 = new Category
-            {
-                Id = 12
-            };
-            var dependent = new Product
-            {
-                Id = 21,
-                CategoryId = 12
-            };
+            var principal1 = new Category { Id = 11 };
+            var principal2 = new Category { Id = 12 };
+            var dependent = new Product { Id = 21, CategoryId = 12 };
 
             manager.StartTracking(manager.GetOrCreateEntry(principal1));
             manager.StartTracking(manager.GetOrCreateEntry(principal2));
@@ -748,25 +593,16 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking.Internal
             Assert.DoesNotContain(dependent, principal2.Products);
         }
 
-        [Fact]
+        [ConditionalFact]
         public void Does_fixup_of_one_to_one_relationship_when_FK_changes()
         {
             var model = BuildModel();
             var contextServices = CreateContextServices(model);
             var manager = contextServices.GetRequiredService<IStateManager>();
 
-            var principal1 = new Product
-            {
-                Id = 21
-            };
-            var principal2 = new Product
-            {
-                Id = 22
-            };
-            var dependent = new ProductDetail
-            {
-                Id = 21
-            };
+            var principal1 = new Product { Id = 21 };
+            var principal2 = new Product { Id = 22 };
+            var dependent = new ProductDetail { Id = 21 };
 
             var principalEntry1 = manager.StartTracking(manager.GetOrCreateEntry(principal1));
             var principalEntry2 = manager.StartTracking(manager.GetOrCreateEntry(principal2));
@@ -800,21 +636,15 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking.Internal
             Assert.Null(principal1.Detail);
         }
 
-        [Fact]
+        [ConditionalFact]
         public void Does_fixup_of_one_to_one_relationship_when_FK_cleared()
         {
             var model = BuildModel();
             var contextServices = CreateContextServices(model);
             var manager = contextServices.GetRequiredService<IStateManager>();
 
-            var principal = new Product
-            {
-                Id = 21
-            };
-            var dependent = new ProductDetail
-            {
-                Id = 21
-            };
+            var principal = new Product { Id = 21 };
+            var dependent = new ProductDetail { Id = 21 };
 
             var principalEntry = manager.StartTracking(manager.GetOrCreateEntry(principal));
             var dependentEntry = manager.StartTracking(manager.GetOrCreateEntry(dependent));
@@ -844,21 +674,15 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking.Internal
             Assert.Null(principal.Detail);
         }
 
-        [Fact]
+        [ConditionalFact]
         public void Does_fixup_of_one_to_one_relationship_when_FK_set()
         {
             var model = BuildModel();
             var contextServices = CreateContextServices(model);
             var manager = contextServices.GetRequiredService<IStateManager>();
 
-            var principal = new Product
-            {
-                Id = 21
-            };
-            var dependent = new ProductDetail
-            {
-                Id = 7
-            };
+            var principal = new Product { Id = 21 };
+            var dependent = new ProductDetail { Id = 7 };
 
             var principalEntry = manager.StartTracking(manager.GetOrCreateEntry(principal));
             var dependentEntry = manager.StartTracking(manager.GetOrCreateEntry(dependent));
@@ -888,26 +712,16 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking.Internal
             Assert.Same(dependent, principal.Detail);
         }
 
-        [Fact]
+        [ConditionalFact]
         public void Does_fixup_of_one_to_one_self_referencing_relationship_when_FK_changes()
         {
             var model = BuildModel();
             var contextServices = CreateContextServices(model);
             var manager = contextServices.GetRequiredService<IStateManager>();
 
-            var entity1 = new Product
-            {
-                Id = 21,
-                AlternateProductId = 22
-            };
-            var entity2 = new Product
-            {
-                Id = 22
-            };
-            var entity3 = new Product
-            {
-                Id = 23
-            };
+            var entity1 = new Product { Id = 21, AlternateProductId = 22 };
+            var entity2 = new Product { Id = 22 };
+            var entity3 = new Product { Id = 23 };
 
             var entry1 = manager.StartTracking(manager.GetOrCreateEntry(entity1));
             var entry2 = manager.StartTracking(manager.GetOrCreateEntry(entity2));
@@ -951,27 +765,16 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking.Internal
             Assert.Same(entity1, entity3.OriginalProduct);
         }
 
-        [Fact]
+        [ConditionalFact]
         public void Can_steal_reference_of_one_to_one_self_referencing_relationship_when_FK_changes()
         {
             var model = BuildModel();
             var contextServices = CreateContextServices(model);
             var manager = contextServices.GetRequiredService<IStateManager>();
 
-            var entity1 = new Product
-            {
-                Id = 21,
-                AlternateProductId = 22
-            };
-            var entity2 = new Product
-            {
-                Id = 22,
-                AlternateProductId = 23
-            };
-            var entity3 = new Product
-            {
-                Id = 23
-            };
+            var entity1 = new Product { Id = 21, AlternateProductId = 22 };
+            var entity2 = new Product { Id = 22, AlternateProductId = 23 };
+            var entity3 = new Product { Id = 23 };
 
             var entry1 = manager.StartTracking(manager.GetOrCreateEntry(entity1));
             var entry2 = manager.StartTracking(manager.GetOrCreateEntry(entity2));
@@ -1017,56 +820,24 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking.Internal
             Assert.Null(entity2.AlternateProductId);
         }
 
-        [Fact]
+        [ConditionalFact]
         public void Does_fixup_of_all_related_principals_when_part_of_overlapping_composite_FK_is_changed()
         {
             var model = BuildModel();
             var contextServices = CreateContextServices(model);
             var manager = contextServices.GetRequiredService<IStateManager>();
 
-            var photo1 = new ProductPhoto
-            {
-                ProductId = 1,
-                PhotoId = "Photo1"
-            };
-            var photo2 = new ProductPhoto
-            {
-                ProductId = 1,
-                PhotoId = "Photo2"
-            };
-            var photo3 = new ProductPhoto
-            {
-                ProductId = 2,
-                PhotoId = "Photo1"
-            };
-            var photo4 = new ProductPhoto
-            {
-                ProductId = 2,
-                PhotoId = "Photo2"
-            };
+            var photo1 = new ProductPhoto { ProductId = 1, PhotoId = "Photo1" };
+            var photo2 = new ProductPhoto { ProductId = 1, PhotoId = "Photo2" };
+            var photo3 = new ProductPhoto { ProductId = 2, PhotoId = "Photo1" };
+            var photo4 = new ProductPhoto { ProductId = 2, PhotoId = "Photo2" };
 
             var reviewId1 = Guid.NewGuid();
             var reviewId2 = Guid.NewGuid();
-            var review1 = new ProductReview
-            {
-                ProductId = 1,
-                ReviewId = reviewId1
-            };
-            var review2 = new ProductReview
-            {
-                ProductId = 1,
-                ReviewId = reviewId2
-            };
-            var review3 = new ProductReview
-            {
-                ProductId = 2,
-                ReviewId = reviewId1
-            };
-            var review4 = new ProductReview
-            {
-                ProductId = 2,
-                ReviewId = reviewId2
-            };
+            var review1 = new ProductReview { ProductId = 1, ReviewId = reviewId1 };
+            var review2 = new ProductReview { ProductId = 1, ReviewId = reviewId2 };
+            var review3 = new ProductReview { ProductId = 2, ReviewId = reviewId1 };
+            var review4 = new ProductReview { ProductId = 2, ReviewId = reviewId2 };
 
             var tag1 = new ProductTag
             {
@@ -1232,35 +1003,17 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking.Internal
             Assert.Same(review4, tag8.Review);
         }
 
-        [Fact]
+        [ConditionalFact]
         public void Removes_dependent_from_collection_after_deletion()
         {
             var contextServices = CreateContextServices();
             var manager = contextServices.GetRequiredService<IStateManager>();
 
-            var principal1 = new Category
-            {
-                Id = 11
-            };
-            var principal2 = new Category
-            {
-                Id = 12
-            };
-            var dependent1 = new Product
-            {
-                Id = 21,
-                CategoryId = 12
-            };
-            var dependent2 = new Product
-            {
-                Id = 22,
-                CategoryId = 12
-            };
-            var dependent3 = new Product
-            {
-                Id = 23,
-                CategoryId = 11
-            };
+            var principal1 = new Category { Id = 11 };
+            var principal2 = new Category { Id = 12 };
+            var dependent1 = new Product { Id = 21, CategoryId = 12 };
+            var dependent2 = new Product { Id = 22, CategoryId = 12 };
+            var dependent3 = new Product { Id = 23, CategoryId = 11 };
 
             var principal1Entry = manager.StartTracking(manager.GetOrCreateEntry(principal1));
             var principal2Entry = manager.StartTracking(manager.GetOrCreateEntry(principal2));
@@ -1322,35 +1075,17 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking.Internal
             Assert.Equal(dependent3.CategoryId, principal1.Id);
         }
 
-        [Fact]
+        [ConditionalFact]
         public void Nulls_navigation_to_principal_after_after_deletion()
         {
             var contextServices = CreateContextServices();
             var manager = contextServices.GetRequiredService<IStateManager>();
 
-            var principal1 = new Category
-            {
-                Id = 11
-            };
-            var principal2 = new Category
-            {
-                Id = 12
-            };
-            var dependent1 = new Product
-            {
-                Id = 21,
-                CategoryId = 12
-            };
-            var dependent2 = new Product
-            {
-                Id = 22,
-                CategoryId = 12
-            };
-            var dependent3 = new Product
-            {
-                Id = 23,
-                CategoryId = 11
-            };
+            var principal1 = new Category { Id = 11 };
+            var principal2 = new Category { Id = 12 };
+            var dependent1 = new Product { Id = 21, CategoryId = 12 };
+            var dependent2 = new Product { Id = 22, CategoryId = 12 };
+            var dependent3 = new Product { Id = 23, CategoryId = 11 };
 
             var principal1Entry = manager.StartTracking(manager.GetOrCreateEntry(principal1));
             var principal2Entry = manager.StartTracking(manager.GetOrCreateEntry(principal2));
@@ -1400,31 +1135,17 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking.Internal
             Assert.Equal(dependent3.CategoryId, principal1.Id);
         }
 
-        [Fact]
+        [ConditionalFact]
         public void Nulls_one_to_one_navigation_to_principal_after_deletion()
         {
             var model = BuildModel();
             var contextServices = CreateContextServices(model);
             var manager = contextServices.GetRequiredService<IStateManager>();
 
-            var principal1 = new Product
-            {
-                Id = 21
-            };
-            var principal2 = new Product
-            {
-                Id = 22
-            };
-            var dependent1 = new Product
-            {
-                Id = 23,
-                AlternateProductId = 21
-            };
-            var dependent2 = new Product
-            {
-                Id = 24,
-                AlternateProductId = 22
-            };
+            var principal1 = new Product { Id = 21 };
+            var principal2 = new Product { Id = 22 };
+            var dependent1 = new Product { Id = 23, AlternateProductId = 21 };
+            var dependent2 = new Product { Id = 24, AlternateProductId = 22 };
 
             var principalEntry1 = manager.StartTracking(manager.GetOrCreateEntry(principal1));
             var principalEntry2 = manager.StartTracking(manager.GetOrCreateEntry(principal2));
@@ -1445,11 +1166,11 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking.Internal
 
             principalEntry1.SetEntityState(EntityState.Deleted);
 
-            Assert.Same(principal1, dependent1.AlternateProduct);
+            Assert.Null(dependent1.AlternateProduct);
             Assert.Same(dependent1, principal1.OriginalProduct);
             Assert.Same(principal2, dependent2.AlternateProduct);
             Assert.Same(dependent2, principal2.OriginalProduct);
-            Assert.Equal(dependent1.AlternateProductId, principal1.Id);
+            Assert.Null(dependent1.AlternateProductId);
             Assert.Equal(dependent2.AlternateProductId, principal2.Id);
 
             principalEntry1.SetEntityState(EntityState.Detached);
@@ -1458,35 +1179,21 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking.Internal
             Assert.Same(dependent1, principal1.OriginalProduct);
             Assert.Same(principal2, dependent2.AlternateProduct);
             Assert.Same(dependent2, principal2.OriginalProduct);
-            Assert.Equal(dependent1.AlternateProductId, principal1.Id);
+            Assert.Null(dependent1.AlternateProductId);
             Assert.Equal(dependent2.AlternateProductId, principal2.Id);
         }
 
-        [Fact]
+        [ConditionalFact]
         public void Nulls_one_to_one_navigation_to_dependent_after_after_deletion()
         {
             var model = BuildModel();
             var contextServices = CreateContextServices(model);
             var manager = contextServices.GetRequiredService<IStateManager>();
 
-            var principal1 = new Product
-            {
-                Id = 21
-            };
-            var principal2 = new Product
-            {
-                Id = 22
-            };
-            var dependent1 = new Product
-            {
-                Id = 23,
-                AlternateProductId = 21
-            };
-            var dependent2 = new Product
-            {
-                Id = 24,
-                AlternateProductId = 22
-            };
+            var principal1 = new Product { Id = 21 };
+            var principal2 = new Product { Id = 22 };
+            var dependent1 = new Product { Id = 23, AlternateProductId = 21 };
+            var dependent2 = new Product { Id = 24, AlternateProductId = 22 };
 
             var principalEntry1 = manager.StartTracking(manager.GetOrCreateEntry(principal1));
             var principalEntry2 = manager.StartTracking(manager.GetOrCreateEntry(principal2));
@@ -1612,41 +1319,25 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking.Internal
                 b =>
                 {
                     b.HasKey(
-                        e => new
-                        {
-                            e.ProductId,
-                            e.PhotoId
-                        });
+                        e => new { e.ProductId, e.PhotoId });
                     b.HasMany(e => e.ProductTags).WithOne(e => e.Photo)
                         .HasForeignKey(
-                            e => new
-                            {
-                                e.ProductId,
-                                e.PhotoId
-                            });
+                            e => new { e.ProductId, e.PhotoId });
                 });
 
             builder.Entity<ProductReview>(
                 b =>
                 {
                     b.HasKey(
-                        e => new
-                        {
-                            e.ProductId,
-                            e.ReviewId
-                        });
+                        e => new { e.ProductId, e.ReviewId });
                     b.HasMany(e => e.ProductTags).WithOne(e => e.Review)
                         .HasForeignKey(
-                            e => new
-                            {
-                                e.ProductId,
-                                e.ReviewId
-                            });
+                            e => new { e.ProductId, e.ReviewId });
                 });
 
             builder.Entity<ProductTag>();
 
-            return builder.Model;
+            return builder.Model.FinalizeModel();
         }
 
         private static INavigationFixer CreateNavigationFixer(IServiceProvider contextServices)

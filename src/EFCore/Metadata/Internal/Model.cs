@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
@@ -6,23 +6,40 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Reflection;
 using JetBrains.Annotations;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Internal;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Microsoft.EntityFrameworkCore.Metadata.Conventions;
 using Microsoft.EntityFrameworkCore.Metadata.Conventions.Internal;
 using Microsoft.EntityFrameworkCore.Utilities;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Microsoft.EntityFrameworkCore.Metadata.Internal
 {
     /// <summary>
-    ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-    ///     directly from your code. This API may change or be removed in future releases.
+    ///     <para>
+    ///         This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+    ///         the same compatibility standards as public APIs. It may be changed or removed without notice in
+    ///         any release. You should only use it directly in your code with extreme caution and knowing that
+    ///         doing so can result in application failures when updating to a new Entity Framework Core release.
+    ///     </para>
+    ///     <para>
+    ///         The service lifetime is <see cref="ServiceLifetime.Scoped" />. This means that each
+    ///         <see cref="DbContext" /> instance will use its own instance of this service.
+    ///         The implementation may depend on other services registered with any lifetime.
+    ///         The implementation does not need to be thread-safe.
+    ///     </para>
     /// </summary>
-    public class Model : ConventionalAnnotatable, IMutableModel
+    public class Model : ConventionAnnotatable, IMutableModel, IConventionModel
     {
         private readonly SortedDictionary<string, EntityType> _entityTypes
             = new SortedDictionary<string, EntityType>(StringComparer.Ordinal);
+
+        private readonly ConcurrentDictionary<Type, PropertyInfo> _indexerPropertyInfoMap
+            = new ConcurrentDictionary<Type, PropertyInfo>();
 
         private readonly ConcurrentDictionary<Type, string> _clrTypeNameMap
             = new ConcurrentDictionary<Type, string>();
@@ -36,9 +53,13 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Internal
         private readonly Dictionary<string, ConfigurationSource> _ignoredTypeNames
             = new Dictionary<string, ConfigurationSource>(StringComparer.Ordinal);
 
+        private readonly HashSet<Type> _sharedEntityClrTypes = new HashSet<Type>();
+
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
         public Model()
             : this(new ConventionSet())
@@ -46,8 +67,10 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Internal
         }
 
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
         public Model([NotNull] ConventionSet conventions)
         {
@@ -59,39 +82,56 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Internal
         }
 
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
-        public virtual ChangeTrackingStrategy ChangeTrackingStrategy { [DebuggerStepThrough] get; set; }
-            = ChangeTrackingStrategy.Snapshot;
+        public virtual ConventionDispatcher ConventionDispatcher { [DebuggerStepThrough] get; private set; }
 
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
-        public virtual ConventionDispatcher ConventionDispatcher { [DebuggerStepThrough] get; }
+        public virtual bool IsReadonly
+            => ConventionDispatcher == null;
 
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+        /// </summary>
+        public virtual bool IsValidated { get; set; }
+
+        /// <summary>
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
         public virtual InternalModelBuilder Builder { [DebuggerStepThrough] get; }
 
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
         public virtual IEnumerable<EntityType> GetEntityTypes()
             => _entityTypes.Values.Concat(_entityTypesWithDefiningNavigation.Values.SelectMany(e => e));
 
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
         public virtual EntityType AddEntityType(
             [NotNull] string name,
-            // ReSharper disable once MethodOverloadWithOptionalParameter
-            ConfigurationSource configurationSource = ConfigurationSource.Explicit)
+            ConfigurationSource configurationSource)
         {
             Check.NotEmpty(name, nameof(name));
 
@@ -101,13 +141,14 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Internal
         }
 
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
         public virtual EntityType AddEntityType(
             [NotNull] Type type,
-            // ReSharper disable once MethodOverloadWithOptionalParameter
-            ConfigurationSource configurationSource = ConfigurationSource.Explicit)
+            ConfigurationSource configurationSource)
         {
             Check.NotNull(type, nameof(type));
 
@@ -117,41 +158,22 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Internal
         }
 
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
-        public virtual EntityType AddQueryType(
-            [NotNull] Type type,
-            // ReSharper disable once MethodOverloadWithOptionalParameter
-            ConfigurationSource configurationSource = ConfigurationSource.Explicit)
-        {
-            Check.NotNull(type, nameof(type));
-
-            var queryType = new EntityType(type, this, configurationSource)
-            {
-                IsQueryType = true
-            };
-
-            return AddEntityType(queryType);
-        }
-
-        /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
-        /// </summary>
-        public virtual EntityType AddQueryType(
+        public virtual EntityType AddEntityType(
             [NotNull] string name,
-            // ReSharper disable once MethodOverloadWithOptionalParameter
-            ConfigurationSource configurationSource = ConfigurationSource.Explicit)
+            [NotNull] Type type,
+            ConfigurationSource configurationSource)
         {
             Check.NotEmpty(name, nameof(name));
+            Check.NotNull(type, nameof(type));
 
-            var queryType = new EntityType(name, this, configurationSource)
-            {
-                IsQueryType = true
-            };
+            var entityType = new EntityType(name, type, this, configurationSource);
 
-            return AddEntityType(queryType);
+            return AddEntityType(entityType);
         }
 
         private EntityType AddEntityType(EntityType entityType)
@@ -180,12 +202,12 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Internal
 
                 if (!_entityTypesWithDefiningNavigation.TryGetValue(entityTypeName, out var entityTypesWithSameType))
                 {
-                    entityTypesWithSameType = new SortedSet<EntityType>(EntityTypePathComparer.Instance);
+                    entityTypesWithSameType = new SortedSet<EntityType>(EntityTypeFullNameComparer.Instance);
                     _entityTypesWithDefiningNavigation[entityTypeName] = entityTypesWithSameType;
                 }
 
                 var added = entityTypesWithSameType.Add(entityType);
-                Debug.Assert(added);
+                Check.DebugAssert(added, "added is false");
             }
             else
             {
@@ -196,54 +218,47 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Internal
 
                 _detachedEntityTypesWithDefiningNavigation.Remove(entityTypeName);
 
-                if (_entityTypes.TryGetValue(entityTypeName, out var clashingEntityType))
+                if (_entityTypes.ContainsKey(entityTypeName))
                 {
-                    if (clashingEntityType.IsQueryType)
-                    {
-                        if (entityType.IsQueryType)
-                        {
-                            throw new InvalidOperationException(CoreStrings.DuplicateQueryType(entityType.DisplayName()));
-                        }
-                        throw new InvalidOperationException(CoreStrings.CannotAccessQueryAsEntity(entityType.DisplayName()));
-                    }
-
-                    if (entityType.IsQueryType)
-                    {
-                        throw new InvalidOperationException(CoreStrings.CannotAccessEntityAsQuery(entityType.DisplayName()));
-                    }
                     throw new InvalidOperationException(CoreStrings.DuplicateEntityType(entityType.DisplayName()));
+                }
+
+                if (entityType.HasSharedClrType)
+                {
+                    _sharedEntityClrTypes.Add(entityType.ClrType);
+                }
+                else if (_sharedEntityClrTypes.Contains(entityType.ClrType))
+                {
+                    throw new InvalidOperationException(CoreStrings.ClashingSharedType(entityType.DisplayName()));
                 }
 
                 _entityTypes.Add(entityTypeName, entityType);
             }
 
-            return ConventionDispatcher.OnEntityTypeAdded(entityType.Builder)?.Metadata;
+            return (EntityType)ConventionDispatcher.OnEntityTypeAdded(entityType.Builder)?.Metadata;
         }
 
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
-        /// </summary>
-        public virtual EntityType GetOrAddEntityType([NotNull] Type type)
-            => FindEntityType(type) ?? AddEntityType(type);
-
-        /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
-        /// </summary>
-        public virtual EntityType GetOrAddEntityType([NotNull] string name)
-            => FindEntityType(name) ?? AddEntityType(name);
-
-        /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
         public virtual EntityType FindEntityType([NotNull] Type type)
-            => FindEntityType(GetDisplayName(type));
+        {
+            if (_sharedEntityClrTypes.Contains(type))
+            {
+                throw new InvalidOperationException(CoreStrings.CannotFindEntityWithClrTypeWhenShared(type.DisplayName()));
+            }
+
+            return FindEntityType(GetDisplayName(type));
+        }
 
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
         public virtual EntityType FindEntityType([NotNull] string name)
             => _entityTypes.TryGetValue(Check.NotEmpty(name, nameof(name)), out var entityType)
@@ -251,39 +266,43 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Internal
                 : null;
 
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
         public virtual EntityType RemoveEntityType([NotNull] Type type)
             => RemoveEntityType(FindEntityType(type));
 
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
         public virtual EntityType RemoveEntityType([NotNull] string name)
             => RemoveEntityType(FindEntityType(name));
 
         private static void AssertCanRemove(EntityType entityType)
         {
-            var foreignKey = entityType.GetDeclaredForeignKeys().FirstOrDefault(fk => fk.PrincipalEntityType != entityType);
-            if (foreignKey != null)
-            {
-                throw new InvalidOperationException(
-                    CoreStrings.EntityTypeInUseByForeignKey(
-                        entityType.DisplayName(),
-                        foreignKey.PrincipalEntityType.DisplayName(),
-                        Property.Format(foreignKey.Properties)));
-            }
-
             var referencingForeignKey = entityType.GetDeclaredReferencingForeignKeys().FirstOrDefault();
             if (referencingForeignKey != null)
             {
                 throw new InvalidOperationException(
                     CoreStrings.EntityTypeInUseByReferencingForeignKey(
                         entityType.DisplayName(),
-                        Property.Format(referencingForeignKey.Properties),
+                        referencingForeignKey.Properties.Format(),
                         referencingForeignKey.DeclaringEntityType.DisplayName()));
+            }
+
+            var referencingSkipNavigation = entityType.GetDeclaredReferencingSkipNavigations().FirstOrDefault();
+            if (referencingSkipNavigation != null)
+            {
+                throw new InvalidOperationException(
+                    CoreStrings.EntityTypeInUseByReferencingSkipNavigation(
+                        entityType.DisplayName(),
+                        referencingSkipNavigation.Name,
+                        referencingSkipNavigation.DeclaringEntityType.DisplayName()));
             }
 
             var derivedEntityType = entityType.GetDirectlyDerivedTypes().FirstOrDefault();
@@ -297,8 +316,10 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Internal
         }
 
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
         public virtual EntityType RemoveEntityType([CanBeNull] EntityType entityType)
         {
@@ -309,6 +330,22 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Internal
 
             AssertCanRemove(entityType);
 
+            foreach (var foreignKey in entityType.GetDeclaredForeignKeys().ToList())
+            {
+                if (foreignKey.PrincipalEntityType != entityType)
+                {
+                    entityType.RemoveForeignKey(foreignKey);
+                }
+            }
+
+            foreach (var skipNavigation in entityType.GetSkipNavigations().ToList())
+            {
+                if (skipNavigation.TargetEntityType != entityType)
+                {
+                    entityType.RemoveSkipNavigation(skipNavigation);
+                }
+            }
+
             var entityTypeName = entityType.Name;
             if (entityType.HasDefiningNavigation())
             {
@@ -318,7 +355,7 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Internal
                 }
 
                 var removed = entityTypesWithSameType.Remove(entityType);
-                Debug.Assert(removed);
+                Check.DebugAssert(removed, "removed is false");
 
                 if (entityTypesWithSameType.Count == 0)
                 {
@@ -328,7 +365,7 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Internal
             else
             {
                 var removed = _entityTypes.Remove(entityTypeName);
-                Debug.Assert(removed);
+                Check.DebugAssert(removed, "removed is false");
             }
 
             entityType.OnTypeRemoved();
@@ -337,14 +374,16 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Internal
         }
 
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
         public virtual EntityType AddEntityType(
             [NotNull] string name,
             [NotNull] string definingNavigationName,
             [NotNull] EntityType definingEntityType,
-            ConfigurationSource configurationSource = ConfigurationSource.Explicit)
+            ConfigurationSource configurationSource)
         {
             Check.NotEmpty(name, nameof(name));
 
@@ -354,14 +393,16 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Internal
         }
 
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
         public virtual EntityType AddEntityType(
             [NotNull] Type type,
             [NotNull] string definingNavigationName,
             [NotNull] EntityType definingEntityType,
-            ConfigurationSource configurationSource = ConfigurationSource.Explicit)
+            ConfigurationSource configurationSource)
         {
             Check.NotNull(type, nameof(type));
 
@@ -371,8 +412,10 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Internal
         }
 
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
         public virtual void AddDetachedEntityType(
             [NotNull] string name,
@@ -389,30 +432,38 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Internal
         }
 
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
         [DebuggerStepThrough]
-        public virtual string GetDisplayName(Type type)
+        public virtual string GetDisplayName([NotNull] Type type)
             => _clrTypeNameMap.GetOrAdd(type, t => t.DisplayName());
 
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
         public virtual bool HasEntityTypeWithDefiningNavigation([NotNull] Type clrType)
             => HasEntityTypeWithDefiningNavigation(GetDisplayName(clrType));
 
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
         public virtual bool HasEntityTypeWithDefiningNavigation([NotNull] string name)
             => _entityTypesWithDefiningNavigation.ContainsKey(name);
 
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
         public virtual bool HasOtherEntityTypesWithDefiningNavigation([NotNull] EntityType entityType)
         {
@@ -423,7 +474,7 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Internal
 
             if (_entityTypesWithDefiningNavigation.TryGetValue(entityType.Name, out var entityTypesWithSameType))
             {
-                if (entityTypesWithSameType.Any(e => EntityTypePathComparer.Instance.Compare(e, entityType) != 0))
+                if (entityTypesWithSameType.Any(e => EntityTypeFullNameComparer.Instance.Compare(e, entityType) != 0))
                 {
                     return true;
                 }
@@ -442,27 +493,33 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Internal
         }
 
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
         public virtual bool EntityTypeShouldHaveDefiningNavigation([NotNull] Type clrType)
             => EntityTypeShouldHaveDefiningNavigation(new TypeIdentity(clrType, this));
 
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
         public virtual bool EntityTypeShouldHaveDefiningNavigation([NotNull] string name)
             => EntityTypeShouldHaveDefiningNavigation(new TypeIdentity(name));
 
         private bool EntityTypeShouldHaveDefiningNavigation(in TypeIdentity type)
             => _entityTypesWithDefiningNavigation.ContainsKey(type.Name)
-               || (_detachedEntityTypesWithDefiningNavigation.TryGetValue(type.Name, out var detachedTypes)
-                   && detachedTypes.Count > 1);
+                || (_detachedEntityTypesWithDefiningNavigation.TryGetValue(type.Name, out var detachedTypes)
+                    && detachedTypes.Count > 1);
 
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
         public virtual EntityType FindEntityType(
             [NotNull] Type type,
@@ -471,25 +528,10 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Internal
             => FindEntityType(GetDisplayName(type), definingNavigationName, definingEntityType);
 
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
-        /// </summary>
-        public virtual EntityType FindEntityType(
-            [NotNull] string name,
-            [NotNull] string definingNavigationName,
-            [NotNull] string definingEntityTypeName)
-        {
-            return !_entityTypesWithDefiningNavigation.TryGetValue(name, out var entityTypesWithSameType)
-                ? null
-                : entityTypesWithSameType
-                .FirstOrDefault(
-                    e => e.DefiningNavigationName == definingNavigationName
-                         && e.DefiningEntityType.Name == definingEntityTypeName);
-        }
-
-        /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
         public virtual EntityType FindEntityType(
             [NotNull] string name,
@@ -501,20 +543,24 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Internal
                     .FirstOrDefault(e => e.DefiningNavigationName == definingNavigationName && e.DefiningEntityType == definingEntityType);
 
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
         public virtual EntityType FindActualEntityType([NotNull] EntityType entityType)
             => entityType.Builder != null
                 ? entityType
                 : (entityType.HasDefiningNavigation()
                     ? FindActualEntityType(entityType.DefiningEntityType)
-                        ?.FindNavigation(entityType.DefiningNavigationName)?.GetTargetType()
+                        ?.FindNavigation(entityType.DefiningNavigationName)?.TargetEntityType
                     : FindEntityType(entityType.Name));
 
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
         public virtual Type FindClrType([NotNull] string name)
             => _entityTypes.TryGetValue(name, out var entityType)
@@ -524,15 +570,19 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Internal
                     : null);
 
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
         public virtual IReadOnlyCollection<EntityType> GetEntityTypes([NotNull] Type type)
             => GetEntityTypes(GetDisplayName(type));
 
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
         public virtual IReadOnlyCollection<EntityType> GetEntityTypes([NotNull] string name)
         {
@@ -542,12 +592,68 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Internal
             }
 
             var entityType = FindEntityType(name);
-            return entityType == null ? Array.Empty<EntityType>() : new[] { entityType };
+            return entityType == null
+                ? Array.Empty<EntityType>()
+                : new[] { entityType };
         }
 
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+        /// </summary>
+        public virtual IReadOnlyList<EntityType> FindLeastDerivedEntityTypes(
+            [NotNull] Type type, [CanBeNull] Func<EntityType, bool> condition = null)
+        {
+            var derivedLevels = new Dictionary<Type, int> { [type] = 0 };
+
+            var leastDerivedTypesGroups = GetEntityTypes()
+                .GroupBy(t => GetDerivedLevel(t.ClrType, derivedLevels))
+                .Where(g => g.Key != int.MaxValue)
+                .OrderBy(g => g.Key);
+
+            foreach (var leastDerivedTypes in leastDerivedTypesGroups)
+            {
+                if (condition == null)
+                {
+                    return leastDerivedTypes.ToList();
+                }
+
+                var filteredTypes = leastDerivedTypes.Where(condition).ToList();
+                if (filteredTypes.Count > 0)
+                {
+                    return filteredTypes;
+                }
+            }
+
+            return new List<EntityType>();
+        }
+
+        private static int GetDerivedLevel(Type derivedType, Dictionary<Type, int> derivedLevels)
+        {
+            if (derivedType?.BaseType == null)
+            {
+                return int.MaxValue;
+            }
+
+            if (derivedLevels.TryGetValue(derivedType, out var level))
+            {
+                return level;
+            }
+
+            var baseType = derivedType.BaseType;
+            level = GetDerivedLevel(baseType, derivedLevels);
+            level += level == int.MaxValue ? 0 : 1;
+            derivedLevels.Add(derivedType, level);
+            return level;
+        }
+
+        /// <summary>
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
         public virtual EntityType RemoveEntityType(
             [NotNull] Type type,
@@ -556,8 +662,10 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Internal
             => RemoveEntityType(FindEntityType(type, definingNavigationName, definingEntityType));
 
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
         public virtual EntityType RemoveEntityType(
             [NotNull] string name,
@@ -566,24 +674,28 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Internal
             => RemoveEntityType(FindEntityType(name, definingNavigationName, definingEntityType));
 
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
-        public virtual void Ignore(
+        public virtual string AddIgnored(
             [NotNull] Type type,
-            ConfigurationSource configurationSource = ConfigurationSource.Explicit)
-            => Ignore(GetDisplayName(Check.NotNull(type, nameof(type))), type, configurationSource);
+            ConfigurationSource configurationSource)
+            => AddIgnored(GetDisplayName(Check.NotNull(type, nameof(type))), type, configurationSource);
 
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
-        public virtual void Ignore(
+        public virtual string AddIgnored(
             [NotNull] string name,
-            ConfigurationSource configurationSource = ConfigurationSource.Explicit)
-            => Ignore(Check.NotNull(name, nameof(name)), null, configurationSource);
+            ConfigurationSource configurationSource)
+            => AddIgnored(Check.NotNull(name, nameof(name)), null, configurationSource);
 
-        private void Ignore(
+        private string AddIgnored(
             [NotNull] string name,
             [CanBeNull] Type type,
             ConfigurationSource configurationSource)
@@ -592,52 +704,185 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Internal
             {
                 configurationSource = configurationSource.Max(existingIgnoredConfigurationSource);
                 _ignoredTypeNames[name] = configurationSource;
-                return;
+                return name;
             }
 
             _ignoredTypeNames[name] = configurationSource;
 
-            ConventionDispatcher.OnEntityTypeIgnored(Builder, name, type);
+            return ConventionDispatcher.OnEntityTypeIgnored(Builder, name, type);
         }
 
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
-        public virtual ConfigurationSource? FindIgnoredTypeConfigurationSource([NotNull] Type type)
+        public virtual ConfigurationSource? FindIgnoredConfigurationSource([NotNull] Type type)
         {
             Check.NotNull(type, nameof(type));
 
-            return FindIgnoredTypeConfigurationSource(GetDisplayName(type));
+            return FindIgnoredConfigurationSource(GetDisplayName(type));
         }
 
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
-        public virtual ConfigurationSource? FindIgnoredTypeConfigurationSource([NotNull] string name)
+        public virtual ConfigurationSource? FindIgnoredConfigurationSource(string name)
             => _ignoredTypeNames.TryGetValue(Check.NotEmpty(name, nameof(name)), out var ignoredConfigurationSource)
                 ? (ConfigurationSource?)ignoredConfigurationSource
                 : null;
 
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
-        public virtual void Unignore([NotNull] Type type)
+        public virtual bool IsIgnored(string name)
+            => FindIgnoredConfigurationSource(name) != null;
+
+        /// <summary>
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+        /// </summary>
+        public virtual bool IsIgnored([NotNull] Type type)
+            => FindIgnoredConfigurationSource(GetDisplayName(type)) != null;
+
+        /// <summary>
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+        /// </summary>
+        public virtual string RemoveIgnored([NotNull] Type type)
         {
             Check.NotNull(type, nameof(type));
-            Unignore(GetDisplayName(type));
+            return RemoveIgnored(GetDisplayName(type));
         }
 
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
-        public virtual void Unignore([NotNull] string name)
+        public virtual string RemoveIgnored(string name)
         {
             Check.NotNull(name, nameof(name));
-            _ignoredTypeNames.Remove(name);
+
+            return _ignoredTypeNames.Remove(name) ? name : null;
+        }
+
+        /// <summary>
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+        /// </summary>
+        public virtual bool IsOwned([NotNull] Type clrType)
+            => FindIsOwnedConfigurationSource(clrType) != null;
+
+        /// <summary>
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+        /// </summary>
+        public virtual ConfigurationSource? FindIsOwnedConfigurationSource([NotNull] Type clrType)
+        {
+            if (!(this[CoreAnnotationNames.OwnedTypes] is Dictionary<string, ConfigurationSource> ownedTypes))
+            {
+                return null;
+            }
+
+            while (clrType != null)
+            {
+                if (ownedTypes.TryGetValue(GetDisplayName(clrType), out var configurationSource))
+                {
+                    return configurationSource;
+                }
+
+                clrType = clrType.BaseType;
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+        /// </summary>
+        public virtual string AddOwned([NotNull] Type clrType, ConfigurationSource configurationSource)
+        {
+            var name = GetDisplayName(clrType);
+            if (!(this[CoreAnnotationNames.OwnedTypes] is Dictionary<string, ConfigurationSource> ownedTypes))
+            {
+                ownedTypes = new Dictionary<string, ConfigurationSource>(StringComparer.Ordinal);
+                this[CoreAnnotationNames.OwnedTypes] = ownedTypes;
+            }
+
+            if (ownedTypes.TryGetValue(name, out var oldConfigurationSource))
+            {
+                ownedTypes[name] = configurationSource.Max(oldConfigurationSource);
+                return name;
+            }
+
+            ownedTypes.Add(name, configurationSource);
+
+            return name;
+        }
+
+        /// <summary>
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+        /// </summary>
+        public virtual string RemoveOwned([NotNull] Type clrType)
+        {
+            if (!(this[CoreAnnotationNames.OwnedTypes] is Dictionary<string, ConfigurationSource> ownedTypes))
+            {
+                return null;
+            }
+
+            var name = GetDisplayName(clrType);
+            return ownedTypes.Remove(name) ? name : null;
+        }
+
+        /// <summary>
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+        /// </summary>
+        public virtual PropertyAccessMode? SetPropertyAccessMode(
+            PropertyAccessMode? propertyAccessMode, ConfigurationSource configurationSource)
+        {
+            this.SetOrRemoveAnnotation(CoreAnnotationNames.PropertyAccessMode, propertyAccessMode, configurationSource);
+
+            return propertyAccessMode;
+        }
+
+        /// <summary>
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+        /// </summary>
+        public virtual ChangeTrackingStrategy? SetChangeTrackingStrategy(
+            ChangeTrackingStrategy? changeTrackingStrategy, ConfigurationSource configurationSource)
+        {
+            this.SetOrRemoveAnnotation(CoreAnnotationNames.ChangeTrackingStrategy, changeTrackingStrategy, configurationSource);
+
+            return changeTrackingStrategy;
         }
 
         /// <summary>
@@ -647,54 +892,294 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Internal
         /// <param name="annotation"> The annotation set. </param>
         /// <param name="oldAnnotation"> The old annotation. </param>
         /// <returns> The annotation that was set. </returns>
-        protected override Annotation OnAnnotationSet(string name, Annotation annotation, Annotation oldAnnotation)
+        protected override IConventionAnnotation OnAnnotationSet(
+            string name, IConventionAnnotation annotation, IConventionAnnotation oldAnnotation)
             => ConventionDispatcher.OnModelAnnotationChanged(Builder, name, annotation, oldAnnotation);
 
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
-        public virtual InternalModelBuilder Validate() => ConventionDispatcher.OnModelBuilt(Builder);
+        public virtual IModel FinalizeModel()
+        {
+            ConventionDispatcher.AssertNoScope();
+            IModel finalizedModel = ConventionDispatcher.OnModelFinalizing(Builder)?.Metadata;
+            if (finalizedModel != null)
+            {
+                finalizedModel = ConventionDispatcher.OnModelFinalized(finalizedModel);
+            }
 
+            return (finalizedModel as Model)?.MakeReadonly() ?? finalizedModel;
+        }
+
+        /// <summary>
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+        /// </summary>
+        private IModel MakeReadonly()
+        {
+            ConventionDispatcher = null;
+            IsValidated = true;
+            return this;
+        }
+
+        /// <summary>
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+        /// </summary>
+        public virtual PropertyInfo FindIndexerPropertyInfo([NotNull] Type type)
+            => _indexerPropertyInfoMap.GetOrAdd(type, type.FindIndexerProperty());
+
+        /// <summary>
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+        /// </summary>
+        public virtual DebugView DebugView
+            => new DebugView(
+                () => this.ToDebugString(MetadataDebugStringOptions.ShortDefault),
+                () => this.ToDebugString(MetadataDebugStringOptions.LongDefault));
+
+        /// <summary>
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+        /// </summary>
         IEntityType IModel.FindEntityType(string name) => FindEntityType(name);
+
+        /// <summary>
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+        /// </summary>
         IEnumerable<IEntityType> IModel.GetEntityTypes() => GetEntityTypes();
 
+        /// <summary>
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+        /// </summary>
         IMutableEntityType IMutableModel.FindEntityType(string name) => FindEntityType(name);
-        IMutableEntityType IMutableModel.AddEntityType(string name) => AddEntityType(name);
-        IMutableEntityType IMutableModel.AddEntityType(Type type) => AddEntityType(type);
-        IMutableEntityType IMutableModel.AddQueryType(Type type) => AddQueryType(type);
-        IMutableEntityType IMutableModel.RemoveEntityType(string name) => RemoveEntityType(name);
 
+        /// <summary>
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+        /// </summary>
+        IMutableEntityType IMutableModel.AddEntityType(string name) => AddEntityType(name, ConfigurationSource.Explicit);
+
+        /// <summary>
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+        /// </summary>
+        IMutableEntityType IMutableModel.AddEntityType(Type type) => AddEntityType(type, ConfigurationSource.Explicit);
+
+        /// <summary>
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+        /// </summary>
+        IMutableEntityType IMutableModel.AddEntityType(string name, Type type) => AddEntityType(name, type, ConfigurationSource.Explicit);
+
+        /// <summary>
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+        /// </summary>
+        IMutableEntityType IMutableModel.RemoveEntityType(IMutableEntityType entityType) => RemoveEntityType((EntityType)entityType);
+
+        /// <summary>
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+        /// </summary>
         IEntityType IModel.FindEntityType(string name, string definingNavigationName, IEntityType definingEntityType)
             => FindEntityType(name, definingNavigationName, (EntityType)definingEntityType);
 
+        /// <summary>
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+        /// </summary>
         IMutableEntityType IMutableModel.FindEntityType(
             string name, string definingNavigationName, IMutableEntityType definingEntityType)
             => FindEntityType(name, definingNavigationName, (EntityType)definingEntityType);
 
+        /// <summary>
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+        /// </summary>
         IMutableEntityType IMutableModel.AddEntityType(
             string name,
             string definingNavigationName,
             IMutableEntityType definingEntityType)
-            => AddEntityType(name, definingNavigationName, (EntityType)definingEntityType);
+            => AddEntityType(name, definingNavigationName, (EntityType)definingEntityType, ConfigurationSource.Explicit);
 
+        /// <summary>
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+        /// </summary>
         IMutableEntityType IMutableModel.AddEntityType(
             Type type,
             string definingNavigationName,
             IMutableEntityType definingEntityType)
-            => AddEntityType(type, definingNavigationName, (EntityType)definingEntityType);
+            => AddEntityType(type, definingNavigationName, (EntityType)definingEntityType, ConfigurationSource.Explicit);
 
-        IMutableEntityType IMutableModel.RemoveEntityType(
-            string name, string definingNavigationName, IMutableEntityType definingEntityType)
-            => RemoveEntityType(name, definingNavigationName, (EntityType)definingEntityType);
-
+        /// <summary>
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+        /// </summary>
         IEnumerable<IMutableEntityType> IMutableModel.GetEntityTypes() => GetEntityTypes();
 
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
-        public virtual DebugView<Model> DebugView
-            => new DebugView<Model>(this, m => m.ToDebugString());
+        string IMutableModel.AddIgnored(string name)
+            => AddIgnored(name, ConfigurationSource.Explicit);
+
+        /// <summary>
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+        /// </summary>
+        IConventionModelBuilder IConventionModel.Builder
+        {
+            [DebuggerStepThrough]
+            get => Builder;
+        }
+
+        /// <summary>
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+        /// </summary>
+        IConventionAnnotatableBuilder IConventionAnnotatable.Builder
+        {
+            [DebuggerStepThrough]
+            get => Builder;
+        }
+
+        /// <summary>
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+        /// </summary>
+        IConventionEntityType IConventionModel.FindEntityType(string name) => FindEntityType(name);
+
+        /// <summary>
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+        /// </summary>
+        IConventionEntityType IConventionModel.FindEntityType(
+            string name, string definingNavigationName, IConventionEntityType definingEntityType)
+            => FindEntityType(name, definingNavigationName, (EntityType)definingEntityType);
+
+        /// <summary>
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+        /// </summary>
+        IConventionEntityType IConventionModel.AddEntityType(string name, bool fromDataAnnotation)
+            => AddEntityType(name, fromDataAnnotation ? ConfigurationSource.DataAnnotation : ConfigurationSource.Convention);
+
+        /// <summary>
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+        /// </summary>
+        IConventionEntityType IConventionModel.AddEntityType(Type clrType, bool fromDataAnnotation)
+            => AddEntityType(clrType, fromDataAnnotation ? ConfigurationSource.DataAnnotation : ConfigurationSource.Convention);
+
+        /// <summary>
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+        /// </summary>
+        IConventionEntityType IConventionModel.AddEntityType(string name, Type clrType, bool fromDataAnnotation)
+            => AddEntityType(name, clrType, fromDataAnnotation ? ConfigurationSource.DataAnnotation : ConfigurationSource.Convention);
+
+        /// <summary>
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+        /// </summary>
+        IConventionEntityType IConventionModel.AddEntityType(
+            string name, string definingNavigationName, IConventionEntityType definingEntityType, bool fromDataAnnotation)
+            => AddEntityType(
+                name, definingNavigationName, (EntityType)definingEntityType,
+                fromDataAnnotation ? ConfigurationSource.DataAnnotation : ConfigurationSource.Convention);
+
+        /// <summary>
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+        /// </summary>
+        IConventionEntityType IConventionModel.AddEntityType(
+            Type clrType, string definingNavigationName, IConventionEntityType definingEntityType, bool fromDataAnnotation)
+            => AddEntityType(
+                clrType, definingNavigationName, (EntityType)definingEntityType,
+                fromDataAnnotation ? ConfigurationSource.DataAnnotation : ConfigurationSource.Convention);
+
+        /// <summary>
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+        /// </summary>
+        IConventionEntityType IConventionModel.RemoveEntityType(IConventionEntityType entityType)
+            => RemoveEntityType((EntityType)entityType);
+
+        /// <summary>
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+        /// </summary>
+        IEnumerable<IConventionEntityType> IConventionModel.GetEntityTypes() => GetEntityTypes();
+
+        /// <summary>
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+        /// </summary>
+        string IConventionModel.AddIgnored(string name, bool fromDataAnnotation)
+            => AddIgnored(name, fromDataAnnotation ? ConfigurationSource.DataAnnotation : ConfigurationSource.Convention);
     }
 }

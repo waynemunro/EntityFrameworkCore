@@ -2,7 +2,8 @@
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
-using Microsoft.EntityFrameworkCore.Internal;
+using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion.Internal;
 using Xunit;
@@ -14,7 +15,7 @@ namespace Microsoft.EntityFrameworkCore.Storage
         private static readonly ValueConverter<string, Beatles> _stringToEnum
             = new StringToEnumConverter<Beatles>();
 
-        [Fact]
+        [ConditionalFact]
         public void Can_convert_strings_to_enums()
         {
             var converter = _stringToEnum.ConvertToProviderExpression.Compile();
@@ -31,7 +32,7 @@ namespace Microsoft.EntityFrameworkCore.Storage
             Assert.Equal(default, converter(null));
         }
 
-        [Fact]
+        [ConditionalFact]
         public void Can_convert_strings_to_enums_object()
         {
             var converter = _stringToEnum.ConvertToProvider;
@@ -48,7 +49,7 @@ namespace Microsoft.EntityFrameworkCore.Storage
             Assert.Null(converter(null));
         }
 
-        [Fact]
+        [ConditionalFact]
         public void Can_convert_enums_to_strings()
         {
             var converter = _stringToEnum.ConvertFromProviderExpression.Compile();
@@ -61,7 +62,7 @@ namespace Microsoft.EntityFrameworkCore.Storage
             Assert.Equal("0", converter(default));
         }
 
-        [Fact]
+        [ConditionalFact]
         public void Can_convert_enums_to_strings_object()
         {
             var converter = _stringToEnum.ConvertFromProvider;
@@ -75,7 +76,7 @@ namespace Microsoft.EntityFrameworkCore.Storage
             Assert.Null(converter(null));
         }
 
-        [Fact]
+        [ConditionalFact]
         public void String_to_enum_converter_throws_for_bad_types()
         {
             Assert.Equal(

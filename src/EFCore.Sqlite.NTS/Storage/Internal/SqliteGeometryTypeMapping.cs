@@ -1,68 +1,77 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
 using System.Data.Common;
 using System.Reflection;
 using System.Text;
-using GeoAPI;
-using GeoAPI.Geometries;
 using JetBrains.Annotations;
 using Microsoft.EntityFrameworkCore.Sqlite.Storage.ValueConversion.Internal;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+using NetTopologySuite;
+using NetTopologySuite.Geometries;
 using NetTopologySuite.IO;
 
 namespace Microsoft.EntityFrameworkCore.Sqlite.Storage.Internal
 {
     /// <summary>
-    ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-    ///     directly from your code. This API may change or be removed in future releases.
+    ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+    ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+    ///     any release. You should only use it directly in your code with extreme caution and knowing that
+    ///     doing so can result in application failures when updating to a new Entity Framework Core release.
     /// </summary>
     public class SqliteGeometryTypeMapping<TGeometry> : RelationalGeometryTypeMapping<TGeometry, byte[]>
-        where TGeometry : IGeometry
+        where TGeometry : Geometry
     {
         private static readonly MethodInfo _getBytes
-            = typeof(DbDataReader).GetTypeInfo()
-                .GetDeclaredMethod(nameof(DbDataReader.GetFieldValue))
+            = typeof(DbDataReader).GetRuntimeMethod(nameof(DbDataReader.GetFieldValue), new[] { typeof(int) })
                 .MakeGenericMethod(typeof(byte[]));
 
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
         [UsedImplicitly]
-        public SqliteGeometryTypeMapping(IGeometryServices geometryServices, string storeType)
+        public SqliteGeometryTypeMapping([NotNull] NtsGeometryServices geometryServices, [NotNull] string storeType)
             : base(new GeometryValueConverter<TGeometry>(CreateReader(geometryServices), CreateWriter()), storeType)
         {
         }
 
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
         protected SqliteGeometryTypeMapping(
             RelationalTypeMappingParameters parameters,
-                ValueConverter<TGeometry, byte[]> converter)
+            [CanBeNull] ValueConverter<TGeometry, byte[]> converter)
             : base(parameters, converter)
         {
         }
 
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
         protected override RelationalTypeMapping Clone(RelationalTypeMappingParameters parameters)
             => new SqliteGeometryTypeMapping<TGeometry>(parameters, SpatialConverter);
 
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
         protected override string GenerateNonNullSqlLiteral(object value)
         {
             var builder = new StringBuilder();
-            var geometry = (IGeometry)value;
+            var geometry = (Geometry)value;
 
             builder
                 .Append("GeomFromText('")
@@ -82,39 +91,47 @@ namespace Microsoft.EntityFrameworkCore.Sqlite.Storage.Internal
         }
 
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
         public override MethodInfo GetDataReaderMethod()
             => _getBytes;
 
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
         protected override string AsText(object value)
-            => ((IGeometry)value).AsText();
+            => ((Geometry)value).AsText();
 
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
         protected override int GetSrid(object value)
-            => ((IGeometry)value).SRID;
+            => ((Geometry)value).SRID;
 
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
         protected override Type WKTReaderType
             => typeof(WKTReader);
 
-        private static GaiaGeoReader CreateReader(IGeometryServices geometryServices)
+        private static GaiaGeoReader CreateReader(NtsGeometryServices geometryServices)
             => new GaiaGeoReader(
                 geometryServices.DefaultCoordinateSequenceFactory,
                 geometryServices.DefaultPrecisionModel);
 
         private static GaiaGeoWriter CreateWriter()
-            => new GaiaGeoWriter();
+            => new GaiaGeoWriter { HandleOrdinates = Ordinates.XY };
     }
 }

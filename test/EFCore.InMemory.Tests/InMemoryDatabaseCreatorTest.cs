@@ -3,10 +3,10 @@
 
 using System;
 using System.Threading.Tasks;
-using Microsoft.EntityFrameworkCore.ChangeTracking.Internal;
 using Microsoft.EntityFrameworkCore.InMemory.Storage.Internal;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Metadata.Conventions;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -16,7 +16,7 @@ namespace Microsoft.EntityFrameworkCore
 {
     public class InMemoryDatabaseCreatorTest
     {
-        [Fact]
+        [ConditionalFact]
         public void EnsureCreated_returns_true_for_first_use_of_persistent_database_and_false_thereafter()
         {
             var serviceProvider = InMemoryTestHelpers.Instance.CreateServiceProvider();
@@ -32,7 +32,7 @@ namespace Microsoft.EntityFrameworkCore
             Assert.False(creator.EnsureCreated());
         }
 
-        [Fact]
+        [ConditionalFact]
         public async Task EnsureCreatedAsync_returns_true_for_first_use_of_persistent_database_and_false_thereafter()
         {
             var serviceProvider = InMemoryTestHelpers.Instance.CreateServiceProvider();
@@ -54,18 +54,16 @@ namespace Microsoft.EntityFrameworkCore
             optionsBuilder.UseInMemoryDatabase(nameof(InMemoryDatabaseCreatorTest));
 
             var contextServices = InMemoryTestHelpers.Instance.CreateContextServices(serviceProvider, optionsBuilder.Options);
-            var model = CreateModel();
-            return new InMemoryDatabaseCreator(
-                contextServices.GetRequiredService<StateManagerDependencies>().With(model));
+            return new InMemoryDatabaseCreator(contextServices.GetRequiredService<IDatabase>());
         }
 
-        [Fact]
+        [ConditionalFact]
         public Task EnsureDeleted_clears_all_in_memory_data_and_returns_true()
         {
             return Delete_clears_all_in_memory_data_test(async: false);
         }
 
-        [Fact]
+        [ConditionalFact]
         public Task EnsureDeletedAsync_clears_all_in_memory_data_and_returns_true()
         {
             return Delete_clears_all_in_memory_data_test(async: true);
@@ -76,31 +74,9 @@ namespace Microsoft.EntityFrameworkCore
             using (var context = new FraggleContext())
             {
                 context.Fraggles.AddRange(
-                    new Fraggle
-                    {
-                        Id = 1,
-                        Name = "Gobo"
-                    }, new Fraggle
-                    {
-                        Id = 2,
-                        Name = "Monkey"
-                    }, new Fraggle
-                    {
-                        Id = 3,
-                        Name = "Red"
-                    }, new Fraggle
-                    {
-                        Id = 4,
-                        Name = "Wembley"
-                    }, new Fraggle
-                    {
-                        Id = 5,
-                        Name = "Boober"
-                    }, new Fraggle
-                    {
-                        Id = 6,
-                        Name = "Uncle Traveling Matt"
-                    });
+                    new Fraggle { Id = 1, Name = "Gobo" }, new Fraggle { Id = 2, Name = "Monkey" }, new Fraggle { Id = 3, Name = "Red" },
+                    new Fraggle { Id = 4, Name = "Wembley" }, new Fraggle { Id = 5, Name = "Boober" },
+                    new Fraggle { Id = 6, Name = "Uncle Traveling Matt" });
 
                 await context.SaveChangesAsync();
             }
@@ -141,7 +117,9 @@ namespace Microsoft.EntityFrameworkCore
             public DbSet<Fraggle> Fraggles { get; set; }
 
             protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-                => optionsBuilder.UseInMemoryDatabase(nameof(FraggleContext));
+                => optionsBuilder
+                    .UseInternalServiceProvider(InMemoryFixture.DefaultServiceProvider)
+                    .UseInMemoryDatabase(nameof(FraggleContext));
         }
 
         private class Fraggle

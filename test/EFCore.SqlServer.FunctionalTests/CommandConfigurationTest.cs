@@ -6,7 +6,6 @@ using System.Linq;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.TestUtilities;
-using Microsoft.EntityFrameworkCore.TestUtilities.Xunit;
 using Xunit;
 
 // ReSharper disable UnusedAutoPropertyAccessor.Local
@@ -23,33 +22,31 @@ namespace Microsoft.EntityFrameworkCore
 
         protected CommandConfigurationFixture Fixture { get; set; }
 
-        [Fact]
+        [ConditionalFact]
         public void Constructed_select_query_CommandBuilder_throws_when_negative_CommandTimeout_is_used()
         {
-            using (var context = CreateContext())
-            {
-                Assert.Throws<ArgumentException>(() => context.Database.SetCommandTimeout(-5));
-            }
+            using var context = CreateContext();
+            Assert.Throws<ArgumentException>(() => context.Database.SetCommandTimeout(-5));
         }
 
         [ConditionalTheory]
-        [SqlServerCondition(SqlServerCondition.SupportsSequences)]
         [InlineData(59, 6)]
         [InlineData(50, 5)]
         [InlineData(20, 2)]
         [InlineData(2, 1)]
         public void Keys_generated_in_batches(int count, int expected)
         {
-            TestHelpers.ExecuteWithStrategyInTransaction<DbContext>(
+            TestHelpers.ExecuteWithStrategyInTransaction(
                 Fixture.CreateContext, UseTransaction,
                 context =>
+                {
+                    for (var i = 0; i < count; i++)
                     {
-                        for (var i = 0; i < count; i++)
-                        {
-                            context.Set<KettleChips>().Add(new KettleChips { BestBuyDate = DateTime.Now, Name = "Doritos Locos Tacos " + i });
-                        }
-                        context.SaveChanges();
-                    });
+                        context.Set<KettleChips>().Add(new KettleChips { BestBuyDate = DateTime.Now, Name = "Doritos Locos Tacos " + i });
+                    }
+
+                    context.SaveChanges();
+                });
 
             Assert.Equal(expected, CountSqlLinesContaining("SELECT NEXT VALUE FOR", Fixture.TestSqlLoggerFactory.Sql));
         }
@@ -84,10 +81,7 @@ namespace Microsoft.EntityFrameworkCore
 
             protected override void OnModelCreating(ModelBuilder modelBuilder)
             {
-                if (TestEnvironment.GetFlag(nameof(SqlServerCondition.SupportsSequences)) ?? true)
-                {
-                    modelBuilder.ForSqlServerUseSequenceHiLo();
-                }
+                modelBuilder.UseHiLo();
             }
         }
 

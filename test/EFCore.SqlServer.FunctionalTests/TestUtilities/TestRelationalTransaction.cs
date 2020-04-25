@@ -1,7 +1,10 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
+using System;
 using System.Data.Common;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Storage;
 
@@ -12,6 +15,7 @@ namespace Microsoft.EntityFrameworkCore.TestUtilities
         public RelationalTransaction Create(
             IRelationalConnection connection,
             DbTransaction transaction,
+            Guid transactionId,
             IDiagnosticsLogger<DbLoggerCategory.Database.Transaction> logger,
             bool transactionOwned)
             => new TestRelationalTransaction(connection, transaction, logger, transactionOwned);
@@ -26,7 +30,7 @@ namespace Microsoft.EntityFrameworkCore.TestUtilities
             DbTransaction transaction,
             IDiagnosticsLogger<DbLoggerCategory.Database.Transaction> logger,
             bool transactionOwned)
-            : base(connection, transaction, logger, transactionOwned)
+            : base(connection, transaction, new Guid(), logger, transactionOwned)
         {
             _testConnection = (TestSqlServerConnection)connection;
         }
@@ -53,6 +57,30 @@ namespace Microsoft.EntityFrameworkCore.TestUtilities
             }
 
             base.Commit();
+        }
+
+        public override async Task CommitAsync(CancellationToken cancellationToken = default)
+        {
+            if (_testConnection.CommitFailures.Count > 0)
+            {
+                var fail = _testConnection.CommitFailures.Dequeue();
+                if (fail.HasValue)
+                {
+                    if (fail.Value)
+                    {
+                        await this.GetDbTransaction().RollbackAsync(cancellationToken);
+                    }
+                    else
+                    {
+                        await this.GetDbTransaction().CommitAsync(cancellationToken);
+                    }
+
+                    await _testConnection.DbConnection.CloseAsync();
+                    throw SqlExceptionFactory.CreateSqlException(_testConnection.ErrorNumber, _testConnection.ConnectionId);
+                }
+            }
+
+            await base.CommitAsync(cancellationToken);
         }
     }
 }

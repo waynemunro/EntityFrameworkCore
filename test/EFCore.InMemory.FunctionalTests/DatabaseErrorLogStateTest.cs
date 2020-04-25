@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore.ChangeTracking.Internal;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
@@ -19,11 +20,11 @@ namespace Microsoft.EntityFrameworkCore
 {
     public class DatabaseErrorLogStateTest
     {
-        [Fact]
+        [ConditionalFact]
         public Task SaveChanges_logs_DatabaseErrorLogState_nonasync()
             => SaveChanges_logs_DatabaseErrorLogState_test(async: false);
 
-        [Fact]
+        [ConditionalFact]
         public Task SaveChanges_logs_DatabaseErrorLogState_async()
             => SaveChanges_logs_DatabaseErrorLogState_test(async: true);
 
@@ -35,41 +36,37 @@ namespace Microsoft.EntityFrameworkCore
                 .AddSingleton<ILoggerFactory>(loggerFactory)
                 .BuildServiceProvider();
 
-            using (var context = new BloggingContext(serviceProvider))
+            using var context = new BloggingContext(serviceProvider);
+            context.Blogs.Add(
+                new BloggingContext.Blog(jimSaysThrow: false) { Url = "http://sample.com" });
+            context.SaveChanges();
+            context.ChangeTracker.Entries().Single().State = EntityState.Added;
+
+            Exception ex;
+            if (async)
             {
-                context.Blogs.Add(
-                    new BloggingContext.Blog(jimSaysThrow: false)
-                    {
-                        Url = "http://sample.com"
-                    });
-                context.SaveChanges();
-                context.ChangeTracker.Entries().Single().State = EntityState.Added;
-
-                Exception ex;
-                if (async)
-                {
-                    ex = await Assert.ThrowsAsync<ArgumentException>(() => context.SaveChangesAsync());
-                }
-                else
-                {
-                    ex = Assert.Throws<ArgumentException>(() => context.SaveChanges());
-                }
-
-                Assert.Same(ex, loggerFactory.Logger.LastDatabaseErrorException);
-                Assert.Same(typeof(BloggingContext), loggerFactory.Logger.LastDatabaseErrorState.Single(p => p.Key == "contextType").Value);
-                Assert.EndsWith(ex.ToString(), loggerFactory.Logger.LastDatabaseErrorFormatter(loggerFactory.Logger.LastDatabaseErrorState, ex));
+                ex = await Assert.ThrowsAsync<ArgumentException>(() => context.SaveChangesAsync());
             }
+            else
+            {
+                ex = Assert.Throws<ArgumentException>(() => context.SaveChanges());
+            }
+
+            Assert.Same(ex, loggerFactory.Logger.LastDatabaseErrorException);
+            Assert.Same(typeof(BloggingContext), loggerFactory.Logger.LastDatabaseErrorState.Single(p => p.Key == "contextType").Value);
+            Assert.EndsWith(
+                ex.ToString(), loggerFactory.Logger.LastDatabaseErrorFormatter(loggerFactory.Logger.LastDatabaseErrorState, ex));
         }
 
-        [Fact]
+        [ConditionalFact]
         public Task Query_logs_DatabaseErrorLogState_during_DbSet_enumeration()
             => Query_logs_DatabaseErrorLogState_test(c => c.Blogs.ToList());
 
-        [Fact]
+        [ConditionalFact]
         public Task Query_logs_DatabaseErrorLogState_during_DbSet_enumeration_async()
             => Query_logs_DatabaseErrorLogState_test(c => c.Blogs.ToListAsync());
 
-        [Fact]
+        [ConditionalFact]
         public Task Query_logs_DatabaseErrorLogState_during_LINQ_enumeration()
             => Query_logs_DatabaseErrorLogState_test(
                 c => c.Blogs
@@ -77,7 +74,7 @@ namespace Microsoft.EntityFrameworkCore
                     .Where(b => b.Url.StartsWith("http://"))
                     .ToList());
 
-        [Fact]
+        [ConditionalFact]
         public Task Query_logs_DatabaseErrorLogState_during_LINQ_enumeration_async()
             => Query_logs_DatabaseErrorLogState_test(
                 c => c.Blogs
@@ -85,20 +82,21 @@ namespace Microsoft.EntityFrameworkCore
                     .Where(b => b.Url.StartsWith("http://"))
                     .ToListAsync());
 
-        [Fact]
+        [ConditionalFact]
         public Task Query_logs_DatabaseErrorLogState_during_single()
             => Query_logs_DatabaseErrorLogState_test(c => c.Blogs.FirstOrDefault());
 
-        [Fact]
+        [ConditionalFact]
         public Task Query_logs_DatabaseErrorLogState_during_single_async()
             => Query_logs_DatabaseErrorLogState_test(c => c.Blogs.FirstOrDefaultAsync());
 
         private Task Query_logs_DatabaseErrorLogState_test(Action<BloggingContext> test)
-            => Query_logs_DatabaseErrorLogState_test(c =>
-            {
-                test(c);
-                return Task.CompletedTask;
-            });
+            => Query_logs_DatabaseErrorLogState_test(
+                c =>
+                {
+                    test(c);
+                    return Task.CompletedTask;
+                });
 
         private async Task Query_logs_DatabaseErrorLogState_test(Func<BloggingContext, Task> test)
         {
@@ -108,28 +106,24 @@ namespace Microsoft.EntityFrameworkCore
                 .AddSingleton<ILoggerFactory>(loggerFactory)
                 .BuildServiceProvider();
 
-            using (var context = new BloggingContext(serviceProvider))
+            using var context = new BloggingContext(serviceProvider);
+            context.Blogs.Add(
+                new BloggingContext.Blog(false) { Url = "http://sample.com" });
+            context.SaveChanges();
+            var entry = context.ChangeTracker.Entries().Single().GetInfrastructure();
+            context.GetService<IStateManager>().StopTracking(entry, entry.EntityState);
+
+            var ex = await Assert.ThrowsAnyAsync<Exception>(() => test(context));
+            while (ex.InnerException != null)
             {
-                context.Blogs.Add(
-                    new BloggingContext.Blog(false)
-                    {
-                        Url = "http://sample.com"
-                    });
-                context.SaveChanges();
-                var entry = context.ChangeTracker.Entries().Single().GetInfrastructure();
-                context.ChangeTracker.GetInfrastructure().StopTracking(entry);
-
-                var ex = await Assert.ThrowsAnyAsync<Exception>(() => test(context));
-                while (ex.InnerException != null)
-                {
-                    ex = ex.InnerException;
-                }
-
-                Assert.Equal("Jim said to throw from ctor!", ex.Message);
-                Assert.Same(ex, loggerFactory.Logger.LastDatabaseErrorException);
-                Assert.Same(typeof(BloggingContext), loggerFactory.Logger.LastDatabaseErrorState.Single(p => p.Key == "contextType").Value);
-                Assert.EndsWith(ex.ToString(), loggerFactory.Logger.LastDatabaseErrorFormatter(loggerFactory.Logger.LastDatabaseErrorState, ex));
+                ex = ex.InnerException;
             }
+
+            Assert.Equal("Jim said to throw from ctor!", ex.Message);
+            Assert.Same(ex, loggerFactory.Logger.LastDatabaseErrorException);
+            Assert.Same(typeof(BloggingContext), loggerFactory.Logger.LastDatabaseErrorState.Single(p => p.Key == "contextType").Value);
+            Assert.EndsWith(
+                ex.ToString(), loggerFactory.Logger.LastDatabaseErrorFormatter(loggerFactory.Logger.LastDatabaseErrorState, ex));
         }
 
         public class BloggingContext : DbContext

@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFrameworks>$(StandardTestTfms)</TargetFrameworks>
@@ -8,12 +8,16 @@
     <CodeAnalysisRuleSet>..\..\EFCore.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
 
-  <ItemGroup>
+ <ItemGroup>
     <ProjectReference Include="..\..\src\EFCore.Analyzers\EFCore.Analyzers.csproj" />
     <ProjectReference Include="..\..\src\EFCore.Relational\EFCore.Relational.csproj" />
-    <PackageReference Include="System.Data.SqlClient" Version="$(SystemDataSqlClientPackageVersion)" />
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="$(MicrosoftCodeAnalysisCSharpWorkspacesPackageVersion)" />
-    <PackageReference Include="Microsoft.Extensions.DependencyModel" Version="$(MicrosoftExtensionsDependencyModelPackageVersion)" />
+    <ProjectReference Include="..\EFCore.Tests\EFCore.Tests.csproj" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="$(MicrosoftCodeAnalysisCSharpWorkspacesVersion)" />
+    <PackageReference Include="Microsoft.Extensions.DependencyModel" Version="$(MicrosoftExtensionsDependencyModelVersion)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit" Version="$(XUnitVersion)" />
   </ItemGroup>
 
 </Project>

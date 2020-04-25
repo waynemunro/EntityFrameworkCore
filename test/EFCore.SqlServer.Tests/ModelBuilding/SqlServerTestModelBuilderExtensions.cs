@@ -8,44 +8,35 @@ namespace Microsoft.EntityFrameworkCore.ModelBuilding
 {
     public static class SqlServerTestModelBuilderExtensions
     {
-        public static ModelBuilderTest.TestIndexBuilder ForSqlServerIsClustered(
-            this ModelBuilderTest.TestIndexBuilder builder, bool clustered = true)
-        {
-            var indexBuilder = builder.GetInfrastructure();
-            indexBuilder.ForSqlServerIsClustered(clustered);
-            return builder;
-        }
-
-        public static ModelBuilderTest.TestReferenceOwnershipBuilder<TEntity, TRelatedEntity> ForSqlServerIsMemoryOptimized<TEntity, TRelatedEntity>(
-            this ModelBuilderTest.TestReferenceOwnershipBuilder<TEntity, TRelatedEntity> builder, bool memoryOptimized = true)
-            where TEntity : class
-            where TRelatedEntity : class
+        public static ModelBuilderTest.TestIndexBuilder<TEntity> IsClustered<TEntity>(
+            this ModelBuilderTest.TestIndexBuilder<TEntity> builder, bool clustered = true)
         {
             switch (builder)
             {
-                case IInfrastructure<ReferenceOwnershipBuilder<TEntity, TRelatedEntity>> genericBuilder:
-                    genericBuilder.Instance.ForSqlServerIsMemoryOptimized(memoryOptimized);
+                case IInfrastructure<IndexBuilder<TEntity>> genericBuilder:
+                    genericBuilder.Instance.IsClustered(clustered);
                     break;
-                case IInfrastructure<ReferenceOwnershipBuilder> nongenericBuilder:
-                    nongenericBuilder.Instance.ForSqlServerIsMemoryOptimized(memoryOptimized);
+                case IInfrastructure<IndexBuilder> nongenericBuilder:
+                    nongenericBuilder.Instance.IsClustered(clustered);
                     break;
             }
 
             return builder;
         }
 
-        public static ModelBuilderTest.TestCollectionOwnershipBuilder<TEntity, TDependentEntity> ForSqlServerIsMemoryOptimized<TEntity, TDependentEntity>(
-            this ModelBuilderTest.TestCollectionOwnershipBuilder<TEntity, TDependentEntity> builder, bool memoryOptimized = true)
+        public static ModelBuilderTest.TestOwnedNavigationBuilder<TEntity, TDependentEntity> IsMemoryOptimized<TEntity,
+            TDependentEntity>(
+            this ModelBuilderTest.TestOwnedNavigationBuilder<TEntity, TDependentEntity> builder, bool memoryOptimized = true)
             where TEntity : class
             where TDependentEntity : class
         {
             switch (builder)
             {
-                case IInfrastructure<CollectionOwnershipBuilder<TEntity, TDependentEntity>> genericBuilder:
-                    genericBuilder.Instance.ForSqlServerIsMemoryOptimized(memoryOptimized);
+                case IInfrastructure<OwnedNavigationBuilder<TEntity, TDependentEntity>> genericBuilder:
+                    genericBuilder.Instance.IsMemoryOptimized(memoryOptimized);
                     break;
-                case IInfrastructure<CollectionOwnershipBuilder> nongenericBuilder:
-                    nongenericBuilder.Instance.ForSqlServerIsMemoryOptimized(memoryOptimized);
+                case IInfrastructure<OwnedNavigationBuilder> nongenericBuilder:
+                    nongenericBuilder.Instance.IsMemoryOptimized(memoryOptimized);
                     break;
             }
 

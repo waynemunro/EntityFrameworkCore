@@ -9,16 +9,32 @@ using Microsoft.EntityFrameworkCore.Storage;
 namespace Microsoft.EntityFrameworkCore.SqlServer.Storage.Internal
 {
     /// <summary>
-    ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-    ///     directly from your code. This API may change or be removed in future releases.
+    ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+    ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+    ///     any release. You should only use it directly in your code with extreme caution and knowing that
+    ///     doing so can result in application failures when updating to a new Entity Framework Core release.
     /// </summary>
     public class SqlServerDateTimeOffsetTypeMapping : DateTimeOffsetTypeMapping
     {
-        private const string DateTimeOffsetFormatConst = "{0:yyyy-MM-ddTHH:mm:ss.fffzzz}";
+        // Note: this array will be accessed using the precision as an index
+        // so the order of the entries in this array is important
+        private readonly string[] _dateTimeOffsetFormats =
+        {
+            "'{0:yyyy-MM-ddTHH:mm:sszzz}'",
+            "'{0:yyyy-MM-ddTHH:mm:ss.fzzz}'",
+            "'{0:yyyy-MM-ddTHH:mm:ss.ffzzz}'",
+            "'{0:yyyy-MM-ddTHH:mm:ss.fffzzz}'",
+            "'{0:yyyy-MM-ddTHH:mm:ss.ffffzzz}'",
+            "'{0:yyyy-MM-ddTHH:mm:ss.fffffzzz}'",
+            "'{0:yyyy-MM-ddTHH:mm:ss.ffffffzzz}'",
+            "'{0:yyyy-MM-ddTHH:mm:ss.fffffffzzz}'"
+        };
 
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
         public SqlServerDateTimeOffsetTypeMapping(
             [NotNull] string storeType,
@@ -28,8 +44,10 @@ namespace Microsoft.EntityFrameworkCore.SqlServer.Storage.Internal
         }
 
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
         protected SqlServerDateTimeOffsetTypeMapping(RelationalTypeMappingParameters parameters)
             : base(parameters)
@@ -45,14 +63,34 @@ namespace Microsoft.EntityFrameworkCore.SqlServer.Storage.Internal
             => new SqlServerDateTimeOffsetTypeMapping(parameters);
 
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
-        protected override string SqlLiteralFormatString => "'" + DateTimeOffsetFormatConst + "'";
+        protected override string SqlLiteralFormatString
+        {
+            get
+            {
+                if (Precision.HasValue)
+                {
+                    var precision = Precision.Value;
+                    if (precision <= 7
+                        && precision >= 0)
+                    {
+                        return _dateTimeOffsetFormats[precision];
+                    }
+                }
+
+                return _dateTimeOffsetFormats[7];
+            }
+        }
 
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
         protected override void ConfigureParameter(DbParameter parameter)
         {
@@ -62,6 +100,11 @@ namespace Microsoft.EntityFrameworkCore.SqlServer.Storage.Internal
                 && Size.Value != -1)
             {
                 parameter.Size = Size.Value;
+            }
+
+            if (Precision.HasValue)
+            {
+                parameter.Precision = unchecked((byte)Precision.Value);
             }
         }
     }

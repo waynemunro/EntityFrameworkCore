@@ -6,12 +6,22 @@ using System.Collections.Generic;
 using System.Linq;
 using JetBrains.Annotations;
 using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Microsoft.EntityFrameworkCore.Sqlite.Storage.Internal
 {
     /// <summary>
-    ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-    ///     directly from your code. This API may change or be removed in future releases.
+    ///     <para>
+    ///         This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+    ///         the same compatibility standards as public APIs. It may be changed or removed without notice in
+    ///         any release. You should only use it directly in your code with extreme caution and knowing that
+    ///         doing so can result in application failures when updating to a new Entity Framework Core release.
+    ///     </para>
+    ///     <para>
+    ///         The service lifetime is <see cref="ServiceLifetime.Singleton" />. This means a single instance
+    ///         is used by many <see cref="DbContext" /> instances. The implementation must be thread-safe.
+    ///         This service cannot depend on services registered as <see cref="ServiceLifetime.Scoped" />.
+    ///     </para>
     /// </summary>
     public class SqliteTypeMappingSource : RelationalTypeMappingSource
     {
@@ -36,7 +46,7 @@ namespace Microsoft.EntityFrameworkCore.Sqlite.Storage.Internal
         private static readonly LongTypeMapping _integer = new LongTypeMapping(IntegerTypeName);
         private static readonly DoubleTypeMapping _real = new DoubleTypeMapping(RealTypeName);
         private static readonly ByteArrayTypeMapping _blob = new ByteArrayTypeMapping(BlobTypeName);
-        private static readonly StringTypeMapping _text = new StringTypeMapping(TextTypeName);
+        private static readonly SqliteStringTypeMapping _text = new SqliteStringTypeMapping(TextTypeName);
 
         private readonly Dictionary<Type, RelationalTypeMapping> _clrTypeMappings
             = new Dictionary<Type, RelationalTypeMapping>
@@ -45,7 +55,7 @@ namespace Microsoft.EntityFrameworkCore.Sqlite.Storage.Internal
                 { typeof(byte[]), _blob },
                 { typeof(bool), new BoolTypeMapping(IntegerTypeName) },
                 { typeof(byte), new ByteTypeMapping(IntegerTypeName) },
-                { typeof(char), new SqliteCharTypeMapping(IntegerTypeName) },
+                { typeof(char), new CharTypeMapping(TextTypeName) },
                 { typeof(int), new IntTypeMapping(IntegerTypeName) },
                 { typeof(long), _integer },
                 { typeof(sbyte), new SByteTypeMapping(IntegerTypeName) },
@@ -59,7 +69,7 @@ namespace Microsoft.EntityFrameworkCore.Sqlite.Storage.Internal
                 { typeof(decimal), new SqliteDecimalTypeMapping(TextTypeName) },
                 { typeof(double), _real },
                 { typeof(float), new FloatTypeMapping(RealTypeName) },
-                { typeof(Guid), new SqliteGuidTypeMapping(BlobTypeName) }
+                { typeof(Guid), new SqliteGuidTypeMapping(TextTypeName) }
             };
 
         private readonly Dictionary<string, RelationalTypeMapping> _storeTypeMappings
@@ -68,12 +78,14 @@ namespace Microsoft.EntityFrameworkCore.Sqlite.Storage.Internal
                 { IntegerTypeName, _integer },
                 { RealTypeName, _real },
                 { BlobTypeName, _blob },
-                { TextTypeName, _text },
+                { TextTypeName, _text }
             };
 
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
         public SqliteTypeMappingSource(
             [NotNull] TypeMappingSourceDependencies dependencies,
@@ -83,15 +95,19 @@ namespace Microsoft.EntityFrameworkCore.Sqlite.Storage.Internal
         }
 
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
-        public static bool IsSpatialiteType(string columnType)
+        public static bool IsSpatialiteType([NotNull] string columnType)
             => _spatialiteTypes.Contains(columnType);
 
         /// <summary>
-        ///     This API supports the Entity Framework Core infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
         protected override RelationalTypeMapping FindMapping(in RelationalTypeMappingInfo mappingInfo)
         {
@@ -111,29 +127,45 @@ namespace Microsoft.EntityFrameworkCore.Sqlite.Storage.Internal
 
             mapping = base.FindMapping(mappingInfo);
 
-            return mapping != null
-                ? mapping
-                : storeTypeName != null
-                    ? storeTypeName.Length != 0
-                        ? _typeRules.Select(r => r(storeTypeName)).FirstOrDefault(r => r != null) ?? _text
-                        : _text // This may seem odd, but it's okay because we are matching SQLite's loose typing.
-                    : null;
+            if (mapping == null
+                && storeTypeName != null)
+            {
+                var affinityTypeMapping = _typeRules.Select(r => r(storeTypeName)).FirstOrDefault(r => r != null);
+
+                if (affinityTypeMapping == null)
+                {
+                    return _blob;
+                }
+
+                if (clrType == null
+                    || affinityTypeMapping.ClrType.UnwrapNullableType() == clrType)
+                {
+                    return affinityTypeMapping;
+                }
+            }
+
+            return mapping;
         }
 
         private readonly Func<string, RelationalTypeMapping>[] _typeRules =
         {
-            name => Contains(name, "INT") ? _integer : null,
-            name => Contains(name, "CHAR")
-                    || Contains(name, "CLOB")
-                    || Contains(name, "TEXT")
-                ? _text
+            name => Contains(name, "INT")
+                ? _integer
                 : null,
-            name => Contains(name, "BLOB") ? _blob : null,
+            name => Contains(name, "CHAR")
+                || Contains(name, "CLOB")
+                || Contains(name, "TEXT")
+                    ? _text
+                    : null,
+            name => Contains(name, "BLOB")
+                || Contains(name, "BIN")
+                    ? _blob
+                    : null,
             name => Contains(name, "REAL")
-                    || Contains(name, "FLOA")
-                    || Contains(name, "DOUB")
-                ? _real
-                : null
+                || Contains(name, "FLOA")
+                || Contains(name, "DOUB")
+                    ? _real
+                    : null
         };
 
         private static bool Contains(string haystack, string needle)

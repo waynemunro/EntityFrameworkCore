@@ -5,13 +5,13 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using JetBrains.Annotations;
+using Microsoft.EntityFrameworkCore.ChangeTracking.Internal;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Internal;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using Microsoft.EntityFrameworkCore.Metadata.Conventions.Internal;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Microsoft.EntityFrameworkCore.Utilities;
 
@@ -54,16 +54,25 @@ namespace Microsoft.EntityFrameworkCore.Migrations.Design
 
             var annotations = model.GetAnnotations().ToList();
 
+            IgnoreAnnotations(
+                annotations,
+                ChangeDetector.SkipDetectChangesAnnotation,
+                CoreAnnotationNames.ChangeTrackingStrategy,
+                CoreAnnotationNames.OwnedTypes,
+                RelationalAnnotationNames.RelationalModel,
+                RelationalAnnotationNames.CheckConstraints,
+                RelationalAnnotationNames.Sequences,
+                RelationalAnnotationNames.DbFunctions);
+
             if (annotations.Count > 0)
             {
                 stringBuilder.Append(builderName);
 
                 using (stringBuilder.Indent())
                 {
-                    GenerateFluentApiForAnnotation(ref annotations, RelationalAnnotationNames.DefaultSchema, nameof(RelationalModelBuilderExtensions.HasDefaultSchema), stringBuilder);
-
-                    IgnoreAnnotationTypes(annotations, RelationalAnnotationNames.DbFunction);
-                    IgnoreAnnotationTypes(annotations, CoreAnnotationNames.OwnedTypesAnnotation);
+                    GenerateFluentApiForAnnotation(
+                        ref annotations, RelationalAnnotationNames.DefaultSchema, nameof(RelationalModelBuilderExtensions.HasDefaultSchema),
+                        stringBuilder);
 
                     GenerateAnnotations(annotations, stringBuilder);
                 }
@@ -71,7 +80,12 @@ namespace Microsoft.EntityFrameworkCore.Migrations.Design
                 stringBuilder.AppendLine(";");
             }
 
-            GenerateEntityTypes(builderName, Sort(model.GetEntityTypes().Where(et => !et.IsQueryType).ToList()), stringBuilder);
+            foreach (var sequence in model.GetSequences())
+            {
+                GenerateSequence(builderName, sequence, stringBuilder);
+            }
+
+            GenerateEntityTypes(builderName, Sort(model.GetEntityTypes().Where(et => !et.IsIgnoredByMigrations()).ToList()), stringBuilder);
         }
 
         private static IReadOnlyList<IEntityType> Sort(IReadOnlyList<IEntityType> entityTypes)
@@ -160,7 +174,7 @@ namespace Microsoft.EntityFrameworkCore.Migrations.Design
                 // ReSharper disable once InlineOutVariableDeclaration
                 var counter = 1;
                 if (builderName.Length > 1
-                    && int.TryParse(builderName.Substring(1, builderName.Length - 1), out counter))
+                    && int.TryParse(builderName[1..], out counter))
                 {
                     counter++;
                 }
@@ -193,12 +207,14 @@ namespace Microsoft.EntityFrameworkCore.Migrations.Design
 
                     GenerateEntityTypeAnnotations(builderName, entityType, stringBuilder);
 
+                    GenerateCheckConstraints(builderName, entityType, stringBuilder);
+
                     if (ownerNavigation != null)
                     {
                         GenerateRelationships(builderName, entityType, stringBuilder);
                     }
 
-                    GenerateData(builderName, entityType.GetProperties(), entityType.GetData(providerValues: true), stringBuilder);
+                    GenerateData(builderName, entityType.GetProperties(), entityType.GetSeedData(providerValues: true), stringBuilder);
                 }
 
                 stringBuilder
@@ -327,6 +343,93 @@ namespace Microsoft.EntityFrameworkCore.Migrations.Design
         }
 
         /// <summary>
+        ///     Generates code for an <see cref="ISequence" />.
+        /// </summary>
+        /// <param name="builderName"> The name of the builder variable. </param>
+        /// <param name="sequence"> The sequence. </param>
+        /// <param name="stringBuilder"> The builder code is added to. </param>
+        protected virtual void GenerateSequence(
+            [NotNull] string builderName,
+            [NotNull] ISequence sequence,
+            [NotNull] IndentedStringBuilder stringBuilder)
+        {
+            stringBuilder
+                .AppendLine()
+                .Append(builderName)
+                .Append(".HasSequence");
+
+            if (sequence.ClrType != Sequence.DefaultClrType)
+            {
+                stringBuilder
+                    .Append("<")
+                    .Append(Code.Reference(sequence.ClrType))
+                    .Append(">");
+            }
+
+            stringBuilder
+                .Append("(")
+                .Append(Code.Literal(sequence.Name));
+
+            if (!string.IsNullOrEmpty(sequence.Schema)
+                && sequence.Model.GetDefaultSchema() != sequence.Schema)
+            {
+                stringBuilder
+                    .Append(", ")
+                    .Append(Code.Literal(sequence.Schema));
+            }
+
+            stringBuilder.Append(")");
+
+            using (stringBuilder.Indent())
+            {
+                if (sequence.StartValue != Sequence.DefaultStartValue)
+                {
+                    stringBuilder
+                        .AppendLine()
+                        .Append(".StartsAt(")
+                        .Append(Code.Literal(sequence.StartValue))
+                        .Append(")");
+                }
+
+                if (sequence.IncrementBy != Sequence.DefaultIncrementBy)
+                {
+                    stringBuilder
+                        .AppendLine()
+                        .Append(".IncrementsBy(")
+                        .Append(Code.Literal(sequence.IncrementBy))
+                        .Append(")");
+                }
+
+                if (sequence.MinValue != Sequence.DefaultMinValue)
+                {
+                    stringBuilder
+                        .AppendLine()
+                        .Append(".HasMin(")
+                        .Append(Code.Literal(sequence.MinValue))
+                        .Append(")");
+                }
+
+                if (sequence.MaxValue != Sequence.DefaultMaxValue)
+                {
+                    stringBuilder
+                        .AppendLine()
+                        .Append(".HasMax(")
+                        .Append(Code.Literal(sequence.MaxValue))
+                        .Append(")");
+                }
+
+                if (sequence.IsCyclic != Sequence.DefaultIsCyclic)
+                {
+                    stringBuilder
+                        .AppendLine()
+                        .Append(".IsCyclic()");
+                }
+            }
+
+            stringBuilder.AppendLine(";");
+        }
+
+        /// <summary>
         ///     Generates code for <see cref="IProperty" /> objects.
         /// </summary>
         /// <param name="builderName"> The name of the builder variable. </param>
@@ -420,80 +523,70 @@ namespace Microsoft.EntityFrameworkCore.Migrations.Design
 
             var annotations = property.GetAnnotations().ToList();
 
+            GenerateFluentApiForAnnotation(
+                ref annotations,
+                RelationalAnnotationNames.ColumnName,
+                nameof(RelationalPropertyBuilderExtensions.HasColumnName),
+                stringBuilder);
+
+            GenerateFluentApiForAnnotation(
+                ref annotations,
+                RelationalAnnotationNames.ViewColumnName,
+                nameof(RelationalPropertyBuilderExtensions.HasViewColumnName),
+                stringBuilder);
+
+            stringBuilder
+                .AppendLine()
+                .Append(".")
+                .Append(nameof(RelationalPropertyBuilderExtensions.HasColumnType))
+                .Append("(")
+                .Append(
+                    Code.Literal(
+                        property.GetColumnType()
+                            ?? Dependencies.RelationalTypeMappingSource.GetMapping(property).StoreType))
+                .Append(")");
+
+            GenerateFluentApiForAnnotation(
+                ref annotations,
+                RelationalAnnotationNames.DefaultValueSql,
+                nameof(RelationalPropertyBuilderExtensions.HasDefaultValueSql),
+                stringBuilder);
+
+            GenerateFluentApiForComputedColumn(ref annotations, stringBuilder);
+
+            GenerateFluentApiForAnnotation(
+                ref annotations,
+                RelationalAnnotationNames.IsFixedLength,
+                nameof(RelationalPropertyBuilderExtensions.IsFixedLength),
+                stringBuilder);
+
+            GenerateFluentApiForAnnotation(
+                ref annotations,
+                RelationalAnnotationNames.Comment,
+                nameof(RelationalPropertyBuilderExtensions.HasComment),
+                stringBuilder);
+
+            GenerateFluentApiForAnnotation(
+                ref annotations,
+                RelationalAnnotationNames.Collation,
+                nameof(RelationalPropertyBuilderExtensions.UseCollation),
+                stringBuilder);
+
+            GenerateFluentApiForAnnotation(
+                ref annotations,
+                CoreAnnotationNames.MaxLength,
+                nameof(PropertyBuilder.HasMaxLength),
+                stringBuilder);
+
+            GenerateFluentApiForPrecisionAndScale(ref annotations, stringBuilder);
+
+            GenerateFluentApiForAnnotation(
+                ref annotations,
+                CoreAnnotationNames.Unicode,
+                nameof(PropertyBuilder.IsUnicode),
+                stringBuilder);
+
             var valueConverter = FindValueConverter(property);
-
-            if (valueConverter != null)
-            {
-                var hints = valueConverter.MappingHints;
-
-                if (hints != null)
-                {
-                    var storeType = Code.Reference(valueConverter.ProviderClrType);
-
-                    stringBuilder
-                        .AppendLine()
-                        .Append(".")
-                        .Append(nameof(PropertyBuilder.HasConversion))
-                        .Append("(new ")
-                        .Append(nameof(ValueConverter))
-                        .Append("<")
-                        .Append(storeType)
-                        .Append(", ")
-                        .Append(storeType)
-                        .Append(">(v => default(")
-                        .Append(storeType)
-                        .Append("), v => default(")
-                        .Append(storeType);
-
-                    var nonNulls = new List<string>();
-
-                    if (hints.Size != null)
-                    {
-                        nonNulls.Add("size: " + Code.Literal(hints.Size.Value));
-                    }
-
-                    if (hints.Precision != null)
-                    {
-                        nonNulls.Add("precision: " + Code.Literal(hints.Precision.Value));
-                    }
-
-                    if (hints.Scale != null)
-                    {
-                        nonNulls.Add("scale: " + Code.Literal(hints.Scale.Value));
-                    }
-
-                    if (hints.IsUnicode != null)
-                    {
-                        nonNulls.Add("unicode: " + Code.Literal(hints.IsUnicode.Value));
-                    }
-
-                    if (hints is RelationalConverterMappingHints relationalHints
-                        && relationalHints.IsFixedLength != null)
-                    {
-                        nonNulls.Add("fixedLength: " + Code.Literal(relationalHints.IsFixedLength.Value));
-                    }
-
-                    stringBuilder
-                        .Append("), new ConverterMappingHints(")
-                        .Append(string.Join(", ", nonNulls))
-                        .Append(")))");
-                }
-            }
-
-            foreach (var consumed in annotations.Where(
-                a => a.Name == CoreAnnotationNames.ValueConverter
-                     || a.Name == CoreAnnotationNames.ProviderClrType).ToList())
-            {
-                annotations.Remove(consumed);
-            }
-
-            GenerateFluentApiForAnnotation(ref annotations, RelationalAnnotationNames.ColumnName, nameof(RelationalPropertyBuilderExtensions.HasColumnName), stringBuilder);
-            GenerateFluentApiForAnnotation(ref annotations, RelationalAnnotationNames.ColumnType, nameof(RelationalPropertyBuilderExtensions.HasColumnType), stringBuilder);
-            GenerateFluentApiForAnnotation(ref annotations, RelationalAnnotationNames.DefaultValueSql, nameof(RelationalPropertyBuilderExtensions.HasDefaultValueSql), stringBuilder);
-            GenerateFluentApiForAnnotation(ref annotations, RelationalAnnotationNames.ComputedColumnSql, nameof(RelationalPropertyBuilderExtensions.HasComputedColumnSql), stringBuilder);
-            GenerateFluentApiForAnnotation(ref annotations, RelationalAnnotationNames.IsFixedLength, nameof(RelationalPropertyBuilderExtensions.IsFixedLength), stringBuilder);
-            GenerateFluentApiForAnnotation(ref annotations, CoreAnnotationNames.MaxLengthAnnotation, nameof(PropertyBuilder.HasMaxLength), stringBuilder);
-            GenerateFluentApiForAnnotation(ref annotations, CoreAnnotationNames.UnicodeAnnotation, nameof(PropertyBuilder.IsUnicode), stringBuilder);
 
             GenerateFluentApiForAnnotation(
                 ref annotations,
@@ -504,19 +597,29 @@ namespace Microsoft.EntityFrameworkCore.Migrations.Design
 
             IgnoreAnnotations(
                 annotations,
-                CoreAnnotationNames.ValueGeneratorFactoryAnnotation,
-                CoreAnnotationNames.PropertyAccessModeAnnotation,
+                RelationalAnnotationNames.ColumnType,
+                RelationalAnnotationNames.TableColumnMappings,
+                RelationalAnnotationNames.ViewColumnMappings,
+                CoreAnnotationNames.ValueGeneratorFactory,
+                CoreAnnotationNames.PropertyAccessMode,
+                CoreAnnotationNames.ChangeTrackingStrategy,
+                CoreAnnotationNames.BeforeSaveBehavior,
+                CoreAnnotationNames.AfterSaveBehavior,
                 CoreAnnotationNames.TypeMapping,
                 CoreAnnotationNames.ValueComparer,
+#pragma warning disable 618
                 CoreAnnotationNames.KeyValueComparer,
-                CoreAnnotationNames.StructuralValueComparer);
+                CoreAnnotationNames.StructuralValueComparer,
+#pragma warning restore 618
+                CoreAnnotationNames.ValueConverter,
+                CoreAnnotationNames.ProviderClrType);
 
             GenerateAnnotations(annotations, stringBuilder);
         }
 
-        private static ValueConverter FindValueConverter(IProperty property)
-            => property.FindMapping()?.Converter
-               ?? property.GetValueConverter();
+        private ValueConverter FindValueConverter(IProperty property)
+            => (property.FindTypeMapping()
+                ?? Dependencies.RelationalTypeMappingSource.FindMapping(property))?.Converter;
 
         /// <summary>
         ///     Generates code for <see cref="IKey" /> objects.
@@ -540,12 +643,15 @@ namespace Microsoft.EntityFrameworkCore.Migrations.Design
                 GenerateKey(builderName, primaryKey, stringBuilder, primary: true);
             }
 
-            foreach (var key in keys.Where(
-                key => key != primaryKey
-                       && (!key.GetReferencingForeignKeys().Any()
-                           || key.GetAnnotations().Any())))
+            if (primaryKey?.DeclaringEntityType.IsOwned() != true)
             {
-                GenerateKey(builderName, key, stringBuilder);
+                foreach (var key in keys.Where(
+                    key => key != primaryKey
+                           && (!key.GetReferencingForeignKeys().Any()
+                               || key.GetAnnotations().Any(a => a.Name != RelationalAnnotationNames.UniqueConstraintMappings))))
+                {
+                    GenerateKey(builderName, key, stringBuilder);
+                }
             }
         }
 
@@ -575,14 +681,29 @@ namespace Microsoft.EntityFrameworkCore.Migrations.Design
 
             using (stringBuilder.Indent())
             {
-                var annotations = key.GetAnnotations().ToList();
-
-                GenerateFluentApiForAnnotation(ref annotations, RelationalAnnotationNames.Name, nameof(RelationalKeyBuilderExtensions.HasName), stringBuilder);
-
-                GenerateAnnotations(annotations, stringBuilder);
+                GenerateKeyAnnotations(key, stringBuilder);
             }
 
             stringBuilder.AppendLine(";");
+        }
+
+        /// <summary>
+        ///     Generates code for the annotations on a key.
+        /// </summary>
+        /// <param name="key"> The key. </param>
+        /// <param name="stringBuilder"> The builder code is added to. </param>
+        protected virtual void GenerateKeyAnnotations([NotNull] IKey key, [NotNull] IndentedStringBuilder stringBuilder)
+        {
+            var annotations = key.GetAnnotations().ToList();
+
+            IgnoreAnnotations(
+                annotations,
+                RelationalAnnotationNames.UniqueConstraintMappings);
+
+            GenerateFluentApiForAnnotation(
+                ref annotations, RelationalAnnotationNames.Name, nameof(RelationalKeyBuilderExtensions.HasName), stringBuilder);
+
+            GenerateAnnotations(annotations, stringBuilder);
         }
 
         /// <summary>
@@ -637,15 +758,32 @@ namespace Microsoft.EntityFrameworkCore.Migrations.Design
                         .Append(".IsUnique()");
                 }
 
-                var annotations = index.GetAnnotations().ToList();
-
-                GenerateFluentApiForAnnotation(ref annotations, RelationalAnnotationNames.Name, nameof(RelationalIndexBuilderExtensions.HasName), stringBuilder);
-                GenerateFluentApiForAnnotation(ref annotations, RelationalAnnotationNames.Filter, nameof(RelationalIndexBuilderExtensions.HasFilter), stringBuilder);
-
-                GenerateAnnotations(annotations, stringBuilder);
+                GenerateIndexAnnotations(index, stringBuilder);
             }
 
             stringBuilder.AppendLine(";");
+        }
+
+        /// <summary>
+        ///     Generates code for the annotations on an index.
+        /// </summary>
+        /// <param name="index"> The index. </param>
+        /// <param name="stringBuilder"> The builder code is added to. </param>
+        protected virtual void GenerateIndexAnnotations(
+            [NotNull] IIndex index, [NotNull] IndentedStringBuilder stringBuilder)
+        {
+            var annotations = index.GetAnnotations().ToList();
+
+            IgnoreAnnotations(
+                annotations,
+                RelationalAnnotationNames.TableIndexMappings);
+
+            GenerateFluentApiForAnnotation(
+                ref annotations, RelationalAnnotationNames.Name, nameof(RelationalIndexBuilderExtensions.HasName), stringBuilder);
+            GenerateFluentApiForAnnotation(
+                ref annotations, RelationalAnnotationNames.Filter, nameof(RelationalIndexBuilderExtensions.HasFilter), stringBuilder);
+
+            GenerateAnnotations(annotations, stringBuilder);
         }
 
         /// <summary>
@@ -677,7 +815,7 @@ namespace Microsoft.EntityFrameworkCore.Migrations.Design
                     .Append(".")
                     .Append(nameof(RelationalEntityTypeBuilderExtensions.ToTable))
                     .Append("(")
-                    .Append(Code.Literal((string)tableNameAnnotation?.Value ?? entityType.Relational().TableName));
+                    .Append(Code.Literal((string)tableNameAnnotation?.Value ?? entityType.GetTableName()));
                 annotations.Remove(tableNameAnnotation);
                 nonDefaultName = true;
             }
@@ -696,16 +834,17 @@ namespace Microsoft.EntityFrameworkCore.Migrations.Design
                 stringBuilder.AppendLine(");");
             }
 
-            var discriminatorPropertyAnnotation = annotations.FirstOrDefault(a => a.Name == RelationalAnnotationNames.DiscriminatorProperty);
-            var discriminatorValueAnnotation = annotations.FirstOrDefault(a => a.Name == RelationalAnnotationNames.DiscriminatorValue);
+            var discriminatorPropertyAnnotation = annotations.FirstOrDefault(a => a.Name == CoreAnnotationNames.DiscriminatorProperty);
+            var discriminatorMappingCompleteAnnotation = annotations.FirstOrDefault(a => a.Name == CoreAnnotationNames.DiscriminatorMappingComplete);
+            var discriminatorValueAnnotation = annotations.FirstOrDefault(a => a.Name == CoreAnnotationNames.DiscriminatorValue);
 
-            if ((discriminatorPropertyAnnotation ?? discriminatorValueAnnotation) != null)
+            if ((discriminatorPropertyAnnotation ?? discriminatorMappingCompleteAnnotation ?? discriminatorValueAnnotation) != null)
             {
                 stringBuilder
                     .AppendLine()
                     .Append(builderName)
                     .Append(".")
-                    .Append(nameof(RelationalEntityTypeBuilderExtensions.HasDiscriminator));
+                    .Append("HasDiscriminator");
 
                 if (discriminatorPropertyAnnotation?.Value != null)
                 {
@@ -726,10 +865,22 @@ namespace Microsoft.EntityFrameworkCore.Migrations.Design
                         .Append("()");
                 }
 
+                if (discriminatorMappingCompleteAnnotation?.Value != null)
+                {
+                    var value = discriminatorMappingCompleteAnnotation.Value;
+
+                    stringBuilder
+                        .Append(".")
+                        .Append("IsComplete")
+                        .Append("(")
+                        .Append(Code.UnknownLiteral(value))
+                        .Append(")");
+                }
+
                 if (discriminatorValueAnnotation?.Value != null)
                 {
                     var value = discriminatorValueAnnotation.Value;
-                    var discriminatorProperty = entityType.RootType().Relational().DiscriminatorProperty;
+                    var discriminatorProperty = entityType.GetRootType().GetDiscriminatorProperty();
                     if (discriminatorProperty != null)
                     {
                         var valueConverter = FindValueConverter(discriminatorProperty);
@@ -741,7 +892,7 @@ namespace Microsoft.EntityFrameworkCore.Migrations.Design
 
                     stringBuilder
                         .Append(".")
-                        .Append(nameof(DiscriminatorBuilder.HasValue))
+                        .Append("HasValue")
                         .Append("(")
                         .Append(Code.UnknownLiteral(value))
                         .Append(")");
@@ -750,22 +901,50 @@ namespace Microsoft.EntityFrameworkCore.Migrations.Design
                 stringBuilder.AppendLine(";");
 
                 annotations.Remove(discriminatorPropertyAnnotation);
+                annotations.Remove(discriminatorMappingCompleteAnnotation);
                 annotations.Remove(discriminatorValueAnnotation);
+            }
+
+            var commentAnnotation = annotations.FirstOrDefault(a => a.Name == RelationalAnnotationNames.Comment);
+
+            if (commentAnnotation != null)
+            {
+                stringBuilder
+                    .AppendLine()
+                    .Append(builderName)
+                    .Append(".")
+                    .Append(nameof(RelationalPropertyBuilderExtensions.HasComment))
+                    .Append("(")
+                    .Append(Code.UnknownLiteral(commentAnnotation.Value))
+                    .AppendLine(");");
+
+                annotations.Remove(commentAnnotation);
             }
 
             IgnoreAnnotations(
                 annotations,
-                RelationshipDiscoveryConvention.NavigationCandidatesAnnotationName,
-                RelationshipDiscoveryConvention.AmbiguousNavigationsAnnotationName,
-                InversePropertyAttributeConvention.InverseNavigationsAnnotationName,
-                CoreAnnotationNames.NavigationAccessModeAnnotation,
-                CoreAnnotationNames.PropertyAccessModeAnnotation,
-                CoreAnnotationNames.ConstructorBinding);
+                CoreAnnotationNames.NavigationCandidates,
+                CoreAnnotationNames.AmbiguousNavigations,
+                CoreAnnotationNames.InverseNavigations,
+                CoreAnnotationNames.NavigationAccessMode,
+                CoreAnnotationNames.PropertyAccessMode,
+                CoreAnnotationNames.ChangeTrackingStrategy,
+                CoreAnnotationNames.ConstructorBinding,
+                CoreAnnotationNames.DefiningQuery,
+                CoreAnnotationNames.QueryFilter,
+                RelationalAnnotationNames.CheckConstraints,
+                RelationalAnnotationNames.TableMappings,
+                RelationalAnnotationNames.ViewMappings);
 
             if (annotations.Count > 0)
             {
                 foreach (var annotation in annotations)
                 {
+                    if (annotation.Value == null)
+                    {
+                        continue;
+                    }
+
                     stringBuilder
                         .AppendLine()
                         .Append(builderName);
@@ -776,6 +955,55 @@ namespace Microsoft.EntityFrameworkCore.Migrations.Design
                         .AppendLine(";");
                 }
             }
+        }
+
+        /// <summary>
+        ///     Generates code for <see cref="ICheckConstraint" /> objects.
+        /// </summary>
+        /// <param name="builderName"> The name of the builder variable. </param>
+        /// <param name="entityType"> The entity type. </param>
+        /// <param name="stringBuilder"> The builder code is added to. </param>
+        protected virtual void GenerateCheckConstraints(
+            [NotNull] string builderName,
+            [NotNull] IEntityType entityType,
+            [NotNull] IndentedStringBuilder stringBuilder)
+        {
+            Check.NotNull(builderName, nameof(builderName));
+            Check.NotNull(entityType, nameof(entityType));
+            Check.NotNull(stringBuilder, nameof(stringBuilder));
+
+            var constraintsForEntity = entityType.GetCheckConstraints();
+
+            foreach (var checkConstraint in constraintsForEntity)
+            {
+                stringBuilder.AppendLine();
+
+                GenerateCheckConstraint(builderName, checkConstraint, stringBuilder);
+            }
+        }
+
+        /// <summary>
+        ///     Generates code for an <see cref="ICheckConstraint" />.
+        /// </summary>
+        /// <param name="builderName"> The name of the builder variable. </param>
+        /// <param name="checkConstraint"> The check constraint. </param>
+        /// <param name="stringBuilder"> The builder code is added to. </param>
+        protected virtual void GenerateCheckConstraint(
+            [NotNull] string builderName,
+            [NotNull] ICheckConstraint checkConstraint,
+            [NotNull] IndentedStringBuilder stringBuilder)
+        {
+            Check.NotNull(builderName, nameof(builderName));
+            Check.NotNull(checkConstraint, nameof(checkConstraint));
+            Check.NotNull(stringBuilder, nameof(stringBuilder));
+
+            stringBuilder
+                .Append(builderName)
+                .Append(".HasCheckConstraint(")
+                .Append(Code.Literal(checkConstraint.Name))
+                .Append(", ")
+                .Append(Code.Literal(checkConstraint.Sql))
+                .AppendLine(");");
         }
 
         /// <summary>
@@ -816,16 +1044,29 @@ namespace Microsoft.EntityFrameworkCore.Migrations.Design
             Check.NotNull(foreignKey, nameof(foreignKey));
             Check.NotNull(stringBuilder, nameof(stringBuilder));
 
-            stringBuilder
-                .Append(builderName)
-                .Append(".HasOne(")
-                .Append(Code.Literal(foreignKey.PrincipalEntityType.Name));
-
-            if (foreignKey.DependentToPrincipal != null)
+            if (!foreignKey.IsOwnership)
             {
                 stringBuilder
+                    .Append(builderName)
+                    .Append(".HasOne(")
+                    .Append(Code.Literal(foreignKey.PrincipalEntityType.Name))
                     .Append(", ")
-                    .Append(Code.Literal(foreignKey.DependentToPrincipal.Name));
+                    .Append(
+                        foreignKey.DependentToPrincipal == null
+                            ? Code.UnknownLiteral(null)
+                            : Code.Literal(foreignKey.DependentToPrincipal.Name));
+            }
+            else
+            {
+                stringBuilder
+                    .Append(builderName)
+                    .Append(".WithOwner(");
+
+                if (foreignKey.DependentToPrincipal != null)
+                {
+                    stringBuilder
+                        .Append(Code.Literal(foreignKey.DependentToPrincipal.Name));
+                }
             }
 
             stringBuilder
@@ -834,7 +1075,8 @@ namespace Microsoft.EntityFrameworkCore.Migrations.Design
 
             using (stringBuilder.Indent())
             {
-                if (foreignKey.IsUnique)
+                if (foreignKey.IsUnique
+                    && !foreignKey.IsOwnership)
                 {
                     stringBuilder
                         .Append(".WithOne(");
@@ -868,17 +1110,22 @@ namespace Microsoft.EntityFrameworkCore.Migrations.Design
                 }
                 else
                 {
-                    stringBuilder
-                        .Append(".WithMany(");
-
-                    if (foreignKey.PrincipalToDependent != null)
+                    if (!foreignKey.IsOwnership)
                     {
                         stringBuilder
-                            .Append(Code.Literal(foreignKey.PrincipalToDependent.Name));
+                            .Append(".WithMany(");
+
+                        if (foreignKey.PrincipalToDependent != null)
+                        {
+                            stringBuilder
+                                .Append(Code.Literal(foreignKey.PrincipalToDependent.Name));
+                        }
+
+                        stringBuilder
+                            .AppendLine(")");
                     }
 
                     stringBuilder
-                        .AppendLine(")")
                         .Append(".HasForeignKey(")
                         .Append(string.Join(", ", foreignKey.Properties.Select(p => Code.Literal(p.Name))))
                         .Append(")");
@@ -895,13 +1142,23 @@ namespace Microsoft.EntityFrameworkCore.Migrations.Design
                     }
                 }
 
-                if (foreignKey.DeleteBehavior != DeleteBehavior.ClientSetNull)
+                if (!foreignKey.IsOwnership)
                 {
-                    stringBuilder
-                        .AppendLine()
-                        .Append(".OnDelete(")
-                        .Append(Code.Literal(foreignKey.DeleteBehavior))
-                        .Append(")");
+                    if (foreignKey.DeleteBehavior != DeleteBehavior.ClientSetNull)
+                    {
+                        stringBuilder
+                            .AppendLine()
+                            .Append(".OnDelete(")
+                            .Append(Code.Literal(foreignKey.DeleteBehavior))
+                            .Append(")");
+                    }
+
+                    if (foreignKey.IsRequired)
+                    {
+                        stringBuilder
+                            .AppendLine()
+                            .Append(".IsRequired()");
+                    }
                 }
             }
 
@@ -913,19 +1170,22 @@ namespace Microsoft.EntityFrameworkCore.Migrations.Design
         /// </summary>
         /// <param name="foreignKey"> The foreign key. </param>
         /// <param name="stringBuilder"> The builder code is added to. </param>
-        protected virtual void GenerateForeignKeyAnnotations([NotNull] IForeignKey foreignKey, [NotNull] IndentedStringBuilder stringBuilder)
+        protected virtual void GenerateForeignKeyAnnotations(
+            [NotNull] IForeignKey foreignKey, [NotNull] IndentedStringBuilder stringBuilder)
         {
             Check.NotNull(foreignKey, nameof(foreignKey));
             Check.NotNull(stringBuilder, nameof(stringBuilder));
 
             var annotations = foreignKey.GetAnnotations().ToList();
 
+            IgnoreAnnotations(
+                annotations,
+                RelationalAnnotationNames.ForeignKeyMappings);
+
             GenerateFluentApiForAnnotation(
                 ref annotations,
                 RelationalAnnotationNames.Name,
-                foreignKey.IsUnique
-                    ? nameof(RelationalReferenceReferenceBuilderExtensions.HasConstraintName)
-                    : nameof(RelationalReferenceCollectionBuilderExtensions.HasConstraintName),
+                "HasConstraintName",
                 stringBuilder);
 
             GenerateAnnotations(annotations, stringBuilder);
@@ -963,7 +1223,8 @@ namespace Microsoft.EntityFrameworkCore.Migrations.Design
             Check.NotNull(annotations, nameof(annotations));
             Check.NotNull(annotationPrefixes, nameof(annotationPrefixes));
 
-            foreach (var ignoreAnnotation in annotations.Where(a => annotationPrefixes.Any(pre => a.Name.StartsWith(pre, StringComparison.OrdinalIgnoreCase))).ToList())
+            foreach (var ignoreAnnotation in annotations
+                .Where(a => annotationPrefixes.Any(pre => a.Name.StartsWith(pre, StringComparison.OrdinalIgnoreCase))).ToList())
             {
                 annotations.Remove(ignoreAnnotation);
             }
@@ -1034,19 +1295,98 @@ namespace Microsoft.EntityFrameworkCore.Migrations.Design
                 stringBuilder
                     .AppendLine()
                     .Append(".")
-                    .Append(fluentApiMethodName);
+                    .Append(fluentApiMethodName)
+                    .Append("(")
+                    .Append(Code.UnknownLiteral(annotationValue))
+                    .Append(")");
 
-                stringBuilder.Append("(");
+                annotations.Remove(annotation);
+            }
+        }
 
-                if (annotationValue != null)
+        /// <summary>
+        ///     Generates a Fluent API call for the Precision and Scale annotations.
+        /// </summary>
+        /// <param name="annotations"> The list of annotations. </param>
+        /// <param name="stringBuilder"> The builder code is added to. </param>
+        protected virtual void GenerateFluentApiForPrecisionAndScale(
+            [NotNull] ref List<IAnnotation> annotations,
+            [NotNull] IndentedStringBuilder stringBuilder)
+        {
+            var precisionAnnotation = annotations
+                .FirstOrDefault(a => a.Name == CoreAnnotationNames.Precision);
+            var precisionValue = precisionAnnotation?.Value;
+
+            if (precisionValue != null)
+            {
+                stringBuilder
+                    .AppendLine()
+                    .Append(".")
+                    .Append(nameof(PropertyBuilder.HasPrecision))
+                    .Append("(")
+                    .Append(Code.UnknownLiteral(precisionValue));
+
+                var scaleAnnotation = annotations
+                    .FirstOrDefault(a => a.Name == CoreAnnotationNames.Scale);
+                var scaleValue = (int?)scaleAnnotation?.Value;
+
+                if (scaleValue != null)
                 {
-                    stringBuilder.Append(Code.UnknownLiteral(annotationValue));
+                    if (scaleValue != 0)
+                    {
+                        stringBuilder
+                            .Append(", ")
+                            .Append(Code.UnknownLiteral(scaleValue));
+                    }
+
+                    annotations.Remove(scaleAnnotation);
                 }
 
                 stringBuilder.Append(")");
 
-                annotations.Remove(annotation);
+                annotations.Remove(precisionAnnotation);
             }
+        }
+
+        /// <summary>
+        ///     Generates a Fluent API call for the computed column annotations.
+        /// </summary>
+        /// <param name="annotations"> The list of annotations. </param>
+        /// <param name="stringBuilder"> The builder code is added to. </param>
+        protected virtual void GenerateFluentApiForComputedColumn(
+            [NotNull] ref List<IAnnotation> annotations,
+            [NotNull] IndentedStringBuilder stringBuilder)
+        {
+            var sql = annotations
+                .FirstOrDefault(a => a.Name == RelationalAnnotationNames.ComputedColumnSql);
+
+            if (sql is null)
+            {
+                return;
+            }
+
+            stringBuilder
+                .AppendLine()
+                .Append(".")
+                .Append(nameof(RelationalPropertyBuilderExtensions.HasComputedColumnSql))
+                .Append("(")
+                .Append(Code.UnknownLiteral(sql.Value));
+
+            var isStored = annotations
+                .FirstOrDefault(a => a.Name == RelationalAnnotationNames.ComputedColumnIsStored);
+
+            if (isStored != null)
+            {
+                stringBuilder
+                    .Append(", ")
+                    .Append(Code.UnknownLiteral(isStored.Value));
+
+                annotations.Remove(isStored);
+            }
+
+            stringBuilder.Append(")");
+
+            annotations.Remove(sql);
         }
 
         /// <summary>

@@ -3,12 +3,10 @@
 
 using System;
 using System.Collections.Generic;
-using System.Data;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.SqlServer.Storage.Internal;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.TestUtilities;
-using Microsoft.EntityFrameworkCore.TestUtilities.Xunit;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -26,10 +24,20 @@ namespace Microsoft.EntityFrameworkCore
         [ConditionalFact]
         public virtual void Columns_have_expected_data_types()
         {
-            var actual = BuiltInDataTypesSqlServerTest.QueryForColumnTypes(CreateContext());
+            var actual = BuiltInDataTypesSqlServerTest.QueryForColumnTypes(
+                CreateContext(),
+                nameof(ObjectBackedDataTypes),
+                nameof(NullableBackedDataTypes),
+                nameof(NonNullableBackedDataTypes),
+                nameof(AnimalDetails));
 
-            const string expected = @"BinaryForeignKeyDataType.BinaryKeyDataTypeId ---> [nullable varbinary] [MaxLength = 900]
+            const string expected = @"Animal.Id ---> [varbinary] [MaxLength = 4]
+AnimalIdentification.AnimalId ---> [varbinary] [MaxLength = 4]
+AnimalIdentification.Id ---> [varbinary] [MaxLength = 4]
+AnimalIdentification.Method ---> [varbinary] [MaxLength = 4]
+BinaryForeignKeyDataType.BinaryKeyDataTypeId ---> [nullable varbinary] [MaxLength = 900]
 BinaryForeignKeyDataType.Id ---> [varbinary] [MaxLength = 4]
+BinaryKeyDataType.Ex ---> [nullable varbinary] [MaxLength = -1]
 BinaryKeyDataType.Id ---> [varbinary] [MaxLength = 900]
 BuiltInDataTypes.Enum16 ---> [varbinary] [MaxLength = 2]
 BuiltInDataTypes.Enum32 ---> [varbinary] [MaxLength = 4]
@@ -160,6 +168,21 @@ UnicodeDataTypes.StringUnicode ---> [nullable varbinary] [MaxLength = -1]
             Assert.Equal(expected, actual, ignoreLineEndingDifferences: true);
         }
 
+        public override void Can_read_back_mapped_enum_from_collection_first_or_default()
+        {
+            // The query needs to generate TOP(1)
+        }
+
+        public override void Can_read_back_bool_mapped_as_int_through_navigation()
+        {
+            // Column is mapped as int rather than byte[]
+        }
+
+        public override void Object_to_string_conversion()
+        {
+            // Return values are string which byte[] cannot read
+        }
+
         public class EverythingIsBytesSqlServerFixture : BuiltInDataTypesFixtureBase
         {
             public override bool StrictEquality => true;
@@ -176,14 +199,15 @@ UnicodeDataTypes.StringUnicode ---> [nullable varbinary] [MaxLength = -1]
 
             public override bool SupportsBinaryKeys => true;
 
+            public override bool SupportsDecimalComparisons => true;
+
             public override DateTime DefaultDateTime => new DateTime();
 
             public override DbContextOptionsBuilder AddOptions(DbContextOptionsBuilder builder)
                 => base
                     .AddOptions(builder)
                     .ConfigureWarnings(
-                        c => c.Log(RelationalEventId.QueryClientEvaluationWarning)
-                            .Log(SqlServerEventId.DecimalTypeDefaultWarning));
+                        c => c.Log(SqlServerEventId.DecimalTypeDefaultWarning));
         }
 
         public class SqlServerBytesTestStoreFactory : SqlServerTestStoreFactory
@@ -197,16 +221,6 @@ UnicodeDataTypes.StringUnicode ---> [nullable varbinary] [MaxLength = -1]
 
         public class SqlServerBytesTypeMappingSource : RelationalTypeMappingSource
         {
-#if Test21
-            private readonly SqlServerByteArrayTypeMapping _rowversion
-                = new SqlServerByteArrayTypeMapping("rowversion", dbType: DbType.Binary, size: 8);
-
-            private readonly SqlServerByteArrayTypeMapping _variableLengthBinary
-                = new SqlServerByteArrayTypeMapping("varbinary");
-
-            private readonly SqlServerByteArrayTypeMapping _fixedLengthBinary
-                = new SqlServerByteArrayTypeMapping("binary");
-#else
             private readonly SqlServerByteArrayTypeMapping _rowversion
                 = new SqlServerByteArrayTypeMapping("rowversion", size: 8);
 
@@ -215,7 +229,6 @@ UnicodeDataTypes.StringUnicode ---> [nullable varbinary] [MaxLength = -1]
 
             private readonly SqlServerByteArrayTypeMapping _fixedLengthBinary
                 = new SqlServerByteArrayTypeMapping(fixedLength: true);
-#endif
 
             private readonly Dictionary<string, RelationalTypeMapping> _storeTypeMappings;
 
@@ -250,42 +263,32 @@ UnicodeDataTypes.StringUnicode ---> [nullable varbinary] [MaxLength = -1]
                         || _storeTypeMappings.TryGetValue(storeTypeNameBase, out mapping))
                     {
                         return clrType == null
-                               || mapping.ClrType == clrType
-                            ? mapping
-                            : null;
+                            || mapping.ClrType == clrType
+                                ? mapping
+                                : null;
                     }
                 }
 
-                if (clrType != null)
+                if (clrType == typeof(byte[]))
                 {
-                    if (clrType == typeof(byte[]))
+                    if (mappingInfo.IsRowVersion == true)
                     {
-                        if (mappingInfo.IsRowVersion == true)
-                        {
-                            return _rowversion;
-                        }
-
-                        var isFixedLength = mappingInfo.IsFixedLength == true;
-
-                        var size = mappingInfo.Size ?? (mappingInfo.IsKeyOrIndex ? (int?)900 : null);
-                        if (size > 8000)
-                        {
-                            size = isFixedLength ? 8000 : (int?)null;
-                        }
-
-#if Test21
-                        return new SqlServerByteArrayTypeMapping(
-                            "varbinary(" + (size == null ? "max" : size.ToString()) + ")",
-                            DbType.Binary,
-                            size);
-#else
-                        return new SqlServerByteArrayTypeMapping(
-                            "varbinary(" + (size == null ? "max" : size.ToString()) + ")",
-                            size,
-                            isFixedLength,
-                            storeTypePostfix: size == null ? StoreTypePostfix.None : (StoreTypePostfix?)null);
-#endif
+                        return _rowversion;
                     }
+
+                    var isFixedLength = mappingInfo.IsFixedLength == true;
+
+                    var size = mappingInfo.Size ?? (mappingInfo.IsKeyOrIndex ? (int?)900 : null);
+                    if (size > 8000)
+                    {
+                        size = isFixedLength ? 8000 : (int?)null;
+                    }
+
+                    return new SqlServerByteArrayTypeMapping(
+                        "varbinary(" + (size == null ? "max" : size.ToString()) + ")",
+                        size,
+                        isFixedLength,
+                        storeTypePostfix: size == null ? StoreTypePostfix.None : (StoreTypePostfix?)null);
                 }
 
                 return null;

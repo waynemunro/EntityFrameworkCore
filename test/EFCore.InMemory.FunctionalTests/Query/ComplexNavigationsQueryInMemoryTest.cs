@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System.Threading.Tasks;
-using Microsoft.EntityFrameworkCore.TestUtilities.Xunit;
+using Xunit;
 using Xunit.Abstractions;
 
 namespace Microsoft.EntityFrameworkCore.Query
@@ -15,22 +15,34 @@ namespace Microsoft.EntityFrameworkCore.Query
             //TestLoggerFactory.TestOutputHelper = testOutputHelper;
         }
 
-        [ConditionalTheory(Skip = "issue #4311")]
-        public override Task Nested_group_join_with_take(bool IsAsync)
+        [ConditionalTheory(Skip = "issue #17386")]
+        public override Task Complex_query_with_optional_navigations_and_client_side_evaluation(bool async)
         {
-            return base.Nested_group_join_with_take(IsAsync);
+            return base.Complex_query_with_optional_navigations_and_client_side_evaluation(async);
         }
 
-        [ConditionalTheory(Skip = "issue #9591")]
-        public override Task Multi_include_with_groupby_in_subquery(bool IsAsync)
+        [ConditionalFact(Skip = "issue #18194")]
+        public override void Member_pushdown_chain_3_levels_deep_entity()
         {
-            return base.Multi_include_with_groupby_in_subquery(IsAsync);
+            base.Member_pushdown_chain_3_levels_deep_entity();
         }
 
-        [ConditionalTheory(Skip = "issue #13561")]
-        public override Task Complex_SelectMany_with_nested_navigations_and_explicit_DefaultIfEmpty_with_other_query_operators_composed_on_top(bool isAsync)
+        [ConditionalTheory(Skip = "issue #17620")]
+        public override Task Lift_projection_mapping_when_pushing_down_subquery(bool async)
         {
-            return base.Complex_SelectMany_with_nested_navigations_and_explicit_DefaultIfEmpty_with_other_query_operators_composed_on_top(isAsync);
+            return base.Lift_projection_mapping_when_pushing_down_subquery(async);
+        }
+
+        [ConditionalTheory(Skip = "issue #19344")]
+        public override Task Select_subquery_single_nested_subquery(bool async)
+        {
+            return base.Select_subquery_single_nested_subquery(async);
+        }
+
+        [ConditionalTheory(Skip = "issue #19344")]
+        public override Task Select_subquery_single_nested_subquery2(bool async)
+        {
+            return base.Select_subquery_single_nested_subquery2(async);
         }
     }
 }

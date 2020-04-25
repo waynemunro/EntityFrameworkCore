@@ -2,11 +2,12 @@
 
   <PropertyGroup>
     <Description>Shared Entity Framework Core components for relational database providers.</Description>
-    <TargetFramework>netstandard2.0</TargetFramework>
+    <TargetFramework>netstandard2.1</TargetFramework>
     <MinClientVersion>3.6</MinClientVersion>
     <AssemblyName>Microsoft.EntityFrameworkCore.Relational</AssemblyName>
     <RootNamespace>Microsoft.EntityFrameworkCore</RootNamespace>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);1591</NoWarn>
     <CodeAnalysisRuleSet>..\..\EFCore.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
 
@@ -16,10 +17,15 @@
 
   <ItemGroup>
     <ProjectReference Include="..\EFCore\EFCore.csproj" PrivateAssets="contentfiles;build" />
+    <ProjectReference Condition="'$(BuildingByReSharper)' != 'true'" Include="..\EFCore.Analyzers\EFCore.Analyzers.csproj" ReferenceOutputAssembly="False" OutputItemType="Analyzer" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="StyleCop.Analyzers" Version="$(StyleCopAnalyzersPackageVersion)" PrivateAssets="All" />
+    <PackageReference Include="StyleCop.Analyzers" Version="$(StyleCopAnalyzersVersion)" PrivateAssets="All" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AdditionalFiles Include="..\stylecop.json" />
   </ItemGroup>
 
   <ItemGroup>
@@ -43,7 +49,7 @@
 
   <ItemGroup>
     <EmbeddedResource Update="Properties\RelationalStrings.resx">
-      <CustomToolNamespace>Microsoft.EntityFrameworkCore.Internal</CustomToolNamespace>
+      <CustomToolNamespace>Microsoft.EntityFrameworkCore.Diagnostics</CustomToolNamespace>
     </EmbeddedResource>
   </ItemGroup>
 

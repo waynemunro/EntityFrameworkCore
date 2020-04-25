@@ -5,10 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.EntityFrameworkCore.Design;
-using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
-using Microsoft.EntityFrameworkCore.Metadata.Conventions;
-using Microsoft.EntityFrameworkCore.Metadata.Conventions.Internal;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using Microsoft.EntityFrameworkCore.SqlServer.Design.Internal;
 using Microsoft.EntityFrameworkCore.TestUtilities;
@@ -16,37 +13,18 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Microsoft.EntityFrameworkCore.Scaffolding.Internal
 {
-
     public abstract class ModelCodeGeneratorTestBase
     {
-        public static ConventionSet BuildNonValidatingConventionSet()
-        {
-            var serviceProvider = new ServiceCollection()
-                .AddEntityFrameworkSqlServer()
-                .AddDbContext<DbContext>(o => o.UseSqlServer("Server=."))
-                .BuildServiceProvider();
-
-            using (var serviceScope = serviceProvider.GetRequiredService<IServiceScopeFactory>().CreateScope())
-            {
-                using (var context = serviceScope.ServiceProvider.GetService<DbContext>())
-                {
-                    return new CompositeConventionSetBuilder(
-                            context.GetService<IEnumerable<IConventionSetBuilder>>().ToList())
-                        .AddConventions(
-                            context.GetService<ICoreConventionSetBuilder>().CreateConventionSet());
-                }
-            }
-        }
-
         protected void Test(
             Action<ModelBuilder> buildModel,
             ModelCodeGenerationOptions options,
             Action<ScaffoldedModel> assertScaffold,
             Action<IModel> assertModel)
         {
-            var modelBuilder = new ModelBuilder(BuildNonValidatingConventionSet());
-            modelBuilder.Model.RemoveAnnotation(CoreAnnotationNames.ProductVersionAnnotation);
+            var modelBuilder = SqlServerTestHelpers.Instance.CreateConventionBuilder(skipValidation: true);
+            modelBuilder.Model.RemoveAnnotation(CoreAnnotationNames.ProductVersion);
             buildModel(modelBuilder);
+            var _ = modelBuilder.Model.GetEntityTypeErrors();
 
             var model = modelBuilder.FinalizeModel();
 
@@ -58,12 +36,12 @@ namespace Microsoft.EntityFrameworkCore.Scaffolding.Internal
                 .BuildServiceProvider()
                 .GetRequiredService<IModelCodeGenerator>();
 
+            options.ModelNamespace ??= "TestNamespace";
+            options.ContextName = "TestDbContext";
+            options.ConnectionString = "Initial Catalog=TestDatabase";
+
             var scaffoldedModel = generator.GenerateModel(
                 model,
-                "TestNamespace",
-                /*contextDir:*/ string.Empty,
-                "TestDbContext",
-                "Initial Catalog=TestDatabase",
                 options);
             assertScaffold(scaffoldedModel);
 
@@ -71,6 +49,7 @@ namespace Microsoft.EntityFrameworkCore.Scaffolding.Internal
             {
                 References =
                 {
+                    BuildReference.ByName("Microsoft.EntityFrameworkCore.Abstractions"),
                     BuildReference.ByName("Microsoft.EntityFrameworkCore"),
                     BuildReference.ByName("Microsoft.EntityFrameworkCore.Relational"),
                     BuildReference.ByName("Microsoft.EntityFrameworkCore.SqlServer")

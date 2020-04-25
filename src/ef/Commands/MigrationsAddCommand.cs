@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System.Collections;
@@ -19,9 +19,10 @@ namespace Microsoft.EntityFrameworkCore.Tools.Commands
             }
         }
 
-        protected override int Execute()
+        protected override int Execute(string[] args)
         {
-            var files = CreateExecutor().AddMigration(_name.Value, _outputDir.Value(), Context.Value());
+            var files = CreateExecutor(args)
+                .AddMigration(_name.Value, _outputDir.Value(), Context.Value(), _namespace.Value());
 
             if (_json.HasValue())
             {
@@ -32,7 +33,7 @@ namespace Microsoft.EntityFrameworkCore.Tools.Commands
                 Reporter.WriteInformation(Resources.MigrationsAddCompleted);
             }
 
-            return base.Execute();
+            return base.Execute(args);
         }
 
         private static void ReportJson(IDictionary files)

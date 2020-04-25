@@ -1,11 +1,10 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
-using System;
-using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using JetBrains.Annotations;
+using Microsoft.EntityFrameworkCore.Utilities;
 
 namespace Microsoft.EntityFrameworkCore.Storage
 {
@@ -21,27 +20,13 @@ namespace Microsoft.EntityFrameworkCore.Storage
     public readonly struct MaterializationContext
     {
         /// <summary>
-        ///     The <see cref="MethodInfo"/> for the <see cref="ValueBuffer"/> get method.
+        ///     The <see cref="MethodInfo" /> for the <see cref="ValueBuffer" /> get method.
         /// </summary>
         public static readonly MethodInfo GetValueBufferMethod
             = typeof(MaterializationContext).GetProperty(nameof(ValueBuffer)).GetMethod;
 
         internal static readonly PropertyInfo ContextProperty
             = typeof(MaterializationContext).GetProperty(nameof(Context));
-
-        internal static readonly ConstructorInfo ObsoleteConstructor
-            = typeof(MaterializationContext).GetConstructor(new[] { typeof(ValueBuffer) });
-
-        /// <summary>
-        ///     Creates a new <see cref="MaterializationContext" /> instance.
-        /// </summary>
-        /// <param name="valueBuffer"> The <see cref="ValueBuffer" /> to use to materialize an entity. </param>
-        [Obsolete("Use the constructor with the most parameters.")]
-        public MaterializationContext(ValueBuffer valueBuffer)
-        {
-            ValueBuffer = valueBuffer;
-            Context = null;
-        }
 
         /// <summary>
         ///     Creates a new <see cref="MaterializationContext" /> instance.
@@ -52,7 +37,7 @@ namespace Microsoft.EntityFrameworkCore.Storage
             in ValueBuffer valueBuffer,
             [NotNull] DbContext context)
         {
-            Debug.Assert(context != null); // Hot path
+            Check.DebugAssert(context != null, "context is null"); // Hot path
 
             ValueBuffer = valueBuffer;
             Context = context;

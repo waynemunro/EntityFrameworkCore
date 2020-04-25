@@ -12,7 +12,7 @@ dotnet ef dbcontext scaffold
 dotnet ef database drop
 dotnet ef database update
     </Description>
-    <TargetFramework>netcoreapp2.2</TargetFramework>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
     <OutputType>Exe</OutputType>
     <PackAsTool>true</PackAsTool>
     <PackAsToolShimRuntimeIdentifiers>win-x64;win-x86</PackAsToolShimRuntimeIdentifiers>
@@ -21,8 +21,13 @@ dotnet ef database update
     <RootNamespace>Microsoft.EntityFrameworkCore.Tools</RootNamespace>
     <IncludeSource>false</IncludeSource>
     <CodeAnalysisRuleSet>..\..\EFCore.ruleset</CodeAnalysisRuleSet>
-    <EnableApiCheck>false</EnableApiCheck>
     <NuspecFile>$(MSBuildProjectName).nuspec</NuspecFile>
+    <!--
+      This keeps ef.exe targeting the default version of .NET Core for netcoreapp5.0,
+      which maximizes the machines on which this tool will be compatible.
+    -->
+    <TargetLatestDotNetRuntime Condition=" '$(IsServicingBuild)' == 'true' ">false</TargetLatestDotNetRuntime>
+    <RollForward>Major</RollForward>
   </PropertyGroup>
 
   <ItemGroup>
@@ -54,10 +59,6 @@ dotnet ef database update
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Newtonsoft.Json" Version="$(NewtonsoftJsonPackageVersion)" />
-  </ItemGroup>
-
-  <ItemGroup>
     <None Update="Properties\Resources.Designer.tt">
       <Generator>TextTemplatingFileGenerator</Generator>
       <LastGenOutput>Resources.Designer.cs</LastGenOutput>
@@ -76,49 +77,26 @@ dotnet ef database update
     </Compile>
   </ItemGroup>
 
-  <ItemGroup>
-    <!-- Additional files to be code signed -->
-    <SignedPackageFile Include="$(TargetPath)" PackagePath="tools/$(TargetFramework)/any/dotnet-ef.dll" Certificate="$(AssemblySigningCertName)" />
-    <SignedPackageFile Include="..\ef\bin\$(Configuration)\net461\ef.exe" PackagePath="tools/$(TargetFramework)/any/tools/net461/any/ef.exe" Certificate="$(AssemblySigningCertName)" />
-    <SignedPackageFile Include="..\ef\bin\x86\$(Configuration)\net461\ef.exe" PackagePath="tools/$(TargetFramework)/any/tools/net461/win-x86/ef.exe" Certificate="$(AssemblySigningCertName)" />
-
-    <!-- Third-party assemblies should be signed with the 3rd party certificate -->
-    <SignedPackageFile Include="$(PublishDir)\Newtonsoft.Json.dll" PackagePath="tools/$(TargetFramework)/any/Newtonsoft.Json.dll" Certificate="$(AssemblySigning3rdPartyCertName)" />
-  </ItemGroup>
-
-  <Target Name="PopulateNuspec" BeforeTargets="GenerateNuspec">
-
+  <Target Name="SetPackageProperties" BeforeTargets="InitializeStandardNuspecProperties"
+      DependsOnTargets="BuiltProjectOutputGroup;DebugSymbolsProjectOutputGroup" >
     <PropertyGroup>
       <!-- Make sure we create a symbols.nupkg. -->
       <IncludeSymbols>true</IncludeSymbols>
-
-      <NuspecProperties>
-        id=$(PackageId);
-        version=$(PackageVersion);
-        authors=$(Authors);
-        description=$(Description);
-        tags=$(PackageTags.Replace(';', ' '));
-        licenseUrl=$(PackageLicenseUrl);
-        projectUrl=$(PackageProjectUrl);
-        iconUrl=$(PackageIconUrl);
-        repositoryUrl=$(RepositoryUrl);
-        repositoryCommit=$(RepositoryCommit);
-        copyright=$(Copyright);
-        packageType=$(PackageType);
-        AssemblyName=$(AssemblyName);
-        targetFramework=$(TargetFramework);
-
-        SettingsFile=$(_ToolsSettingsFilePath);
-        Output=$(PublishDir)**\*;
-        OutputBinary=..\ef\bin\$(Configuration)\netcoreapp2.0\ef.dll;
-        OutputRuntimeConfig=..\ef\bin\$(Configuration)\netcoreapp2.0\ef.runtimeconfig.json;
-        OutputSymbol=..\ef\bin\$(Configuration)\netcoreapp2.0\ef.pdb;
-        OutputExe=..\ef\bin\$(Configuration)\net461\ef.exe;
-        OutputExeSymbol=..\ef\bin\$(Configuration)\net461\ef.pdb;
-        OutputX86Exe=..\ef\bin\x86\$(Configuration)\net461\ef.exe;
-        OutputX86ExeSymbol=..\ef\bin\x86\$(Configuration)\net461\ef.pdb;
-      </NuspecProperties>
     </PropertyGroup>
-  </Target>
 
+    <ItemGroup>
+      <NuspecProperty Include="packageType=$(PackageType)" />
+      <NuspecProperty Include="targetFramework=$(TargetFramework)" />
+
+      <NuspecProperty Include="SettingsFile=$(_ToolsSettingsFilePath)" />
+      <NuspecProperty Include="Output=$(PublishDir)**\*" />
+      <NuspecProperty Include="OutputBinary=..\..\artifacts\bin\ef\$(Configuration)\netcoreapp2.0\ef.dll" />
+      <NuspecProperty Include="OutputRuntimeConfig=..\..\artifacts\bin\ef\$(Configuration)\netcoreapp2.0\ef.runtimeconfig.json" />
+      <NuspecProperty Include="OutputSymbol=..\..\artifacts\bin\ef\$(Configuration)\netcoreapp2.0\ef.pdb" />
+      <NuspecProperty Include="OutputExe=..\..\artifacts\bin\ef\$(Configuration)\net461\ef.exe" />
+      <NuspecProperty Include="OutputExeSymbol=..\..\artifacts\bin\ef\$(Configuration)\net461\ef.pdb" />
+      <NuspecProperty Include="OutputX86Exe=..\..\artifacts\bin\ef\x86\$(Configuration)\net461\ef.exe" />
+      <NuspecProperty Include="OutputX86ExeSymbol=..\..\artifacts\bin\ef\x86\$(Configuration)\net461\ef.pdb" />
+    </ItemGroup>
+  </Target>
 </Project>

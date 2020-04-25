@@ -11,15 +11,14 @@ namespace Microsoft.EntityFrameworkCore
             : base(fixture)
         {
             Fixture.TestSqlLoggerFactory.Clear();
-            //Fixture.TestSqlLoggerFactory.SetTestOutputHelper(testOutputHelper);
         }
 
         public override void Property_entry_original_value_is_set()
         {
             base.Property_entry_original_value_is_set();
 
-            AssertContainsSql(
-                @"SELECT TOP(1) [e].[Id], [e].[EngineSupplierId], [e].[Name], [e].[Id], [e].[StorageLocation_Latitude], [e].[StorageLocation_Longitude]
+            AssertSql(
+                @"SELECT TOP(1) [e].[Id], [e].[EngineSupplierId], [e].[Name], [e].[StorageLocation_Latitude], [e].[StorageLocation_Longitude]
 FROM [Engines] AS [e]
 ORDER BY [e].[Id]",
                 //
@@ -27,14 +26,16 @@ ORDER BY [e].[Id]",
 @p2='1'
 @p0='FO 108X' (Size = 4000)
 @p3='ChangedEngine' (Size = 4000)
+@p4='47.64491'
+@p5='-122.128101'
 
 SET NOCOUNT ON;
 UPDATE [Engines] SET [Name] = @p0
-WHERE [Id] = @p1 AND [EngineSupplierId] = @p2 AND [Name] = @p3;
+WHERE [Id] = @p1 AND [EngineSupplierId] = @p2 AND [Name] = @p3 AND [StorageLocation_Latitude] = @p4 AND [StorageLocation_Longitude] = @p5;
 SELECT @@ROWCOUNT;");
         }
 
-        private void AssertContainsSql(params string[] expected)
-            => Fixture.TestSqlLoggerFactory.AssertBaseline(expected, assertOrder: false);
+        private void AssertSql(params string[] expected)
+            => Fixture.TestSqlLoggerFactory.AssertBaseline(expected);
     }
 }

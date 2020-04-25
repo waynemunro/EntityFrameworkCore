@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System.ComponentModel.DataAnnotations;
@@ -57,15 +57,16 @@ namespace Microsoft.EntityFrameworkCore.Diagnostics
 
             // Query events
             QueryIterationFailed = CoreBaseId + 100,
-            QueryModelCompiling,
-            RowLimitingOperationWithoutOrderByWarning,
-            FirstWithoutOrderByAndFilterWarning,
-            QueryModelOptimized,
-            NavigationIncluded,
-            IncludeIgnoredWarning,
+            Obsolete_QueryModelCompiling,
+            Obsolete_RowLimitingOperationWithoutOrderByWarning,
+            Obsolete_FirstWithoutOrderByAndFilterWarning,
+            Obsolete_QueryModelOptimized,
+            Obsolete_NavigationIncluded,
+            Obsolete_IncludeIgnoredWarning,
             QueryExecutionPlanned,
             PossibleUnintendedCollectionNavigationNullComparisonWarning,
             PossibleUnintendedReferenceComparisonWarning,
+            InvalidIncludePathError,
 
             // Infrastructure events
             SensitiveDataLoggingEnabledWarning = CoreBaseId + 400,
@@ -78,8 +79,9 @@ namespace Microsoft.EntityFrameworkCore.Diagnostics
             ContextDisposed,
             DetachedLazyLoadingWarning,
             ServiceProviderDebugInfo,
+            RedundantAddServicesCallWarning,
 
-            // Model events
+            // Model and ModelValidation events
             ShadowPropertyCreated = CoreBaseId + 600,
             RedundantIndexRemoved,
             IncompatibleMatchingForeignKeyProperties,
@@ -95,6 +97,13 @@ namespace Microsoft.EntityFrameworkCore.Diagnostics
             ForeignKeyAttributesOnBothNavigationsWarning,
             ConflictingForeignKeyAttributesOnNavigationAndPropertyWarning,
             RedundantForeignKeyWarning,
+            NonNullableInverted,
+            NonNullableReferenceOnBothNavigations,
+            NonNullableReferenceOnDependent,
+            RequiredAttributeInverted,
+            RequiredAttributeOnCollection,
+            CollectionWithoutComparer,
+            ConflictingKeylessAndKeyAttributesWarning,
 
             // ChangeTracking events
             DetectChangesStarting = CoreBaseId + 800,
@@ -128,7 +137,8 @@ namespace Microsoft.EntityFrameworkCore.Diagnostics
         ///     The same entity is being tracked as a different weak entity type.
         ///     This event is in the <see cref="DbLoggerCategory.Update" /> category.
         /// </summary>
-        public static readonly EventId DuplicateDependentEntityTypeInstanceWarning = MakeUpdateId(Id.DuplicateDependentEntityTypeInstanceWarning);
+        public static readonly EventId DuplicateDependentEntityTypeInstanceWarning =
+            MakeUpdateId(Id.DuplicateDependentEntityTypeInstanceWarning);
 
         private static readonly string _queryPrefix = DbLoggerCategory.Query.Name + ".";
         private static EventId MakeQueryId(Id id) => new EventId((int)id, _queryPrefix + id);
@@ -145,84 +155,6 @@ namespace Microsoft.EntityFrameworkCore.Diagnostics
         ///     </para>
         /// </summary>
         public static readonly EventId QueryIterationFailed = MakeQueryId(Id.QueryIterationFailed);
-
-        /// <summary>
-        ///     <para>
-        ///         A query model is being compiled.
-        ///     </para>
-        ///     <para>
-        ///         This event is in the <see cref="DbLoggerCategory.Query" /> category.
-        ///     </para>
-        ///     <para>
-        ///         This event uses the <see cref="QueryModelEventData" /> payload when used with a <see cref="DiagnosticSource" />.
-        ///     </para>
-        /// </summary>
-        public static readonly EventId QueryModelCompiling = MakeQueryId(Id.QueryModelCompiling);
-
-        /// <summary>
-        ///     <para>
-        ///         A query uses a row limiting operation (Skip/Take) without OrderBy which may lead to unpredictable results.
-        ///     </para>
-        ///     <para>
-        ///         This event is in the <see cref="DbLoggerCategory.Query" /> category.
-        ///     </para>
-        ///     <para>
-        ///         This event uses the <see cref="QueryModelEventData" /> payload when used with a <see cref="DiagnosticSource" />.
-        ///     </para>
-        /// </summary>
-        public static readonly EventId RowLimitingOperationWithoutOrderByWarning = MakeQueryId(Id.RowLimitingOperationWithoutOrderByWarning);
-
-        /// <summary>
-        ///     <para>
-        ///         A query uses First/FirstOrDefault operation without OrderBy and filter which may lead to unpredictable results.
-        ///     </para>
-        ///     <para>
-        ///         This event is in the <see cref="DbLoggerCategory.Query" /> category.
-        ///     </para>
-        ///     <para>
-        ///         This event uses the <see cref="QueryModelEventData" /> payload when used with a <see cref="DiagnosticSource" />.
-        ///     </para>
-        /// </summary>
-        public static readonly EventId FirstWithoutOrderByAndFilterWarning = MakeQueryId(Id.FirstWithoutOrderByAndFilterWarning);
-
-        /// <summary>
-        ///     <para>
-        ///         A query model was optimized.
-        ///     </para>
-        ///     <para>
-        ///         This event is in the <see cref="DbLoggerCategory.Query" /> category.
-        ///     </para>
-        ///     <para>
-        ///         This event uses the <see cref="QueryModelEventData" /> payload when used with a <see cref="DiagnosticSource" />.
-        ///     </para>
-        /// </summary>
-        public static readonly EventId QueryModelOptimized = MakeQueryId(Id.QueryModelOptimized);
-
-        /// <summary>
-        ///     <para>
-        ///         A navigation was included in the query.
-        ///     </para>
-        ///     <para>
-        ///         This event is in the <see cref="DbLoggerCategory.Query" /> category.
-        ///     </para>
-        ///     <para>
-        ///         This event uses the <see cref="IncludeEventData" /> payload when used with a <see cref="DiagnosticSource" />.
-        ///     </para>
-        /// </summary>
-        public static readonly EventId NavigationIncluded = MakeQueryId(Id.NavigationIncluded);
-
-        /// <summary>
-        ///     <para>
-        ///         A navigation was ignored while compiling a query.
-        ///     </para>
-        ///     <para>
-        ///         This event is in the <see cref="DbLoggerCategory.Query" /> category.
-        ///     </para>
-        ///     <para>
-        ///         This event uses the <see cref="IncludeEventData" /> payload when used with a <see cref="DiagnosticSource" />.
-        ///     </para>
-        /// </summary>
-        public static readonly EventId IncludeIgnoredWarning = MakeQueryId(Id.IncludeIgnoredWarning);
 
         /// <summary>
         ///     <para>
@@ -245,7 +177,7 @@ namespace Microsoft.EntityFrameworkCore.Diagnostics
         ///         This event is in the <see cref="DbLoggerCategory.Query" /> category.
         ///     </para>
         ///     <para>
-        ///         This event uses the <see cref="NavigationPathEventData" /> payload when used with a <see cref="DiagnosticSource" />.
+        ///         This event uses the <see cref="NavigationEventData" /> payload when used with a <see cref="DiagnosticSource" />.
         ///     </para>
         /// </summary>
         public static readonly EventId PossibleUnintendedCollectionNavigationNullComparisonWarning
@@ -264,6 +196,20 @@ namespace Microsoft.EntityFrameworkCore.Diagnostics
         /// </summary>
         public static readonly EventId PossibleUnintendedReferenceComparisonWarning
             = MakeQueryId(Id.PossibleUnintendedReferenceComparisonWarning);
+
+        /// <summary>
+        ///     <para>
+        ///         Invalid include path '{navigationChain}', couldn't find navigation for '{navigationName}'.
+        ///     </para>
+        ///     <para>
+        ///         This event is in the <see cref="DbLoggerCategory.Query" /> category.
+        ///     </para>
+        ///     <para>
+        ///         This event uses the <see cref="InvalidIncludePathEventData" /> payload when used with a <see cref="DiagnosticSource" />.
+        ///     </para>
+        /// </summary>
+        public static readonly EventId InvalidIncludePathError
+            = MakeQueryId(Id.InvalidIncludePathError);
 
         private static readonly string _infraPrefix = DbLoggerCategory.Infrastructure.Name + ".";
         private static EventId MakeInfraId(Id id) => new EventId((int)id, _infraPrefix + id);
@@ -385,8 +331,24 @@ namespace Microsoft.EntityFrameworkCore.Diagnostics
         /// </summary>
         public static readonly EventId DetachedLazyLoadingWarning = MakeInfraId(Id.DetachedLazyLoadingWarning);
 
+        /// <summary>
+        ///     <para>
+        ///         'AddEntityFramework*' was called on the service provider, but 'UseInternalServiceProvider' wasn't.
+        ///     </para>
+        ///     <para>
+        ///         This event is in the <see cref="DbLoggerCategory.Infrastructure" /> category.
+        ///     </para>
+        ///     <para>
+        ///         This event uses the <see cref="ServiceProviderEventData" /> payload when used with a <see cref="DiagnosticSource" />.
+        ///     </para>
+        /// </summary>
+        public static readonly EventId RedundantAddServicesCallWarning = MakeInfraId(Id.RedundantAddServicesCallWarning);
+
         private static readonly string _modelPrefix = DbLoggerCategory.Model.Name + ".";
         private static EventId MakeModelId(Id id) => new EventId((int)id, _modelPrefix + id);
+
+        private static readonly string _modelValidationPrefix = DbLoggerCategory.Model.Validation.Name + ".";
+        private static EventId MakeModelValidationId(Id id) => new EventId((int)id, _modelValidationPrefix + id);
 
         /// <summary>
         ///     <para>
@@ -399,14 +361,14 @@ namespace Microsoft.EntityFrameworkCore.Diagnostics
         ///         This event uses the <see cref="PropertyEventData" /> payload when used with a <see cref="DiagnosticSource" />.
         ///     </para>
         /// </summary>
-        public static readonly EventId ShadowPropertyCreated = MakeModelId(Id.ShadowPropertyCreated);
+        public static readonly EventId ShadowPropertyCreated = MakeModelValidationId(Id.ShadowPropertyCreated);
 
         /// <summary>
         ///     <para>
         ///         An index was not created as the properties are already covered.
         ///     </para>
         ///     <para>
-        ///         This event is in the <see cref="DbLoggerCategory.Model" /> category.
+        ///         This event is in the <see cref="DbLoggerCategory.Model.Validation" /> category.
         ///     </para>
         ///     <para>
         ///         This event uses the <see cref="TwoPropertyBaseCollectionsEventData" /> payload when used with a
@@ -441,7 +403,21 @@ namespace Microsoft.EntityFrameworkCore.Diagnostics
         ///         This event uses the <see cref="NavigationEventData" /> payload when used with a <see cref="DiagnosticSource" />.
         ///     </para>
         /// </summary>
-        public static readonly EventId RequiredAttributeOnDependent = MakeModelId(Id.RequiredAttributeOnDependent);
+        public static readonly EventId RequiredAttributeInverted = MakeModelId(Id.RequiredAttributeInverted);
+
+        /// <summary>
+        ///     <para>
+        ///         The entity type with the navigation property that has non-nullability
+        ///         was configured as the dependent side in the relationship.
+        ///     </para>
+        ///     <para>
+        ///         This event is in the <see cref="DbLoggerCategory.Model" /> category.
+        ///     </para>
+        ///     <para>
+        ///         This event uses the <see cref="NavigationEventData" /> payload when used with a <see cref="DiagnosticSource" />.
+        ///     </para>
+        /// </summary>
+        public static readonly EventId NonNullableInverted = MakeModelId(Id.NonNullableInverted);
 
         /// <summary>
         ///     <para>
@@ -455,6 +431,58 @@ namespace Microsoft.EntityFrameworkCore.Diagnostics
         ///     </para>
         /// </summary>
         public static readonly EventId RequiredAttributeOnBothNavigations = MakeModelId(Id.RequiredAttributeOnBothNavigations);
+
+        /// <summary>
+        ///     <para>
+        ///         Navigations separated into two relationships as non-nullability was specified on both navigations.
+        ///     </para>
+        ///     <para>
+        ///         This event is in the <see cref="DbLoggerCategory.Model" /> category.
+        ///     </para>
+        ///     <para>
+        ///         This event uses the <see cref="TwoPropertyBaseCollectionsEventData" /> payload when used with a <see cref="DiagnosticSource" />.
+        ///     </para>
+        /// </summary>
+        public static readonly EventId NonNullableReferenceOnBothNavigations = MakeModelId(Id.NonNullableReferenceOnBothNavigations);
+
+        /// <summary>
+        ///     <para>
+        ///         The <see cref="RequiredAttribute" /> on the navigation property to the dependent entity was ignored.
+        ///     </para>
+        ///     <para>
+        ///         This event is in the <see cref="DbLoggerCategory.Model" /> category.
+        ///     </para>
+        ///     <para>
+        ///         This event uses the <see cref="NavigationEventData" /> payload when used with a <see cref="DiagnosticSource" />.
+        ///     </para>
+        /// </summary>
+        public static readonly EventId RequiredAttributeOnDependent = MakeModelId(Id.RequiredAttributeOnDependent);
+
+        /// <summary>
+        ///     <para>
+        ///         The non-nullability of the navigation property to the dependent entity was ignored.
+        ///     </para>
+        ///     <para>
+        ///         This event is in the <see cref="DbLoggerCategory.Model" /> category.
+        ///     </para>
+        ///     <para>
+        ///         This event uses the <see cref="NavigationEventData" /> payload when used with a <see cref="DiagnosticSource" />.
+        ///     </para>
+        /// </summary>
+        public static readonly EventId NonNullableReferenceOnDependent = MakeModelId(Id.NonNullableReferenceOnDependent);
+
+        /// <summary>
+        ///     <para>
+        ///         The <see cref="RequiredAttribute" /> on the collection navigation property was ignored.
+        ///     </para>
+        ///     <para>
+        ///         This event is in the <see cref="DbLoggerCategory.Model" /> category.
+        ///     </para>
+        ///     <para>
+        ///         This event uses the <see cref="NavigationEventData" /> payload when used with a <see cref="DiagnosticSource" />.
+        ///     </para>
+        /// </summary>
+        public static readonly EventId RequiredAttributeOnCollection = MakeModelId(Id.RequiredAttributeOnCollection);
 
         /// <summary>
         ///     <para>
@@ -510,7 +538,8 @@ namespace Microsoft.EntityFrameworkCore.Diagnostics
         ///         <see cref="DiagnosticSource" />.
         ///     </para>
         /// </summary>
-        public static readonly EventId MultipleInversePropertiesSameTargetWarning = MakeModelId(Id.MultipleInversePropertiesSameTargetWarning);
+        public static readonly EventId MultipleInversePropertiesSameTargetWarning =
+            MakeModelId(Id.MultipleInversePropertiesSameTargetWarning);
 
         /// <summary>
         ///     <para>
@@ -553,7 +582,8 @@ namespace Microsoft.EntityFrameworkCore.Diagnostics
         ///         <see cref="DiagnosticSource" />.
         ///     </para>
         /// </summary>
-        public static readonly EventId ForeignKeyAttributesOnBothPropertiesWarning = MakeModelId(Id.ForeignKeyAttributesOnBothPropertiesWarning);
+        public static readonly EventId ForeignKeyAttributesOnBothPropertiesWarning =
+            MakeModelId(Id.ForeignKeyAttributesOnBothPropertiesWarning);
 
         /// <summary>
         ///     <para>
@@ -592,14 +622,29 @@ namespace Microsoft.EntityFrameworkCore.Diagnostics
         ///         The configured <see cref="IForeignKey" /> is redundant.
         ///     </para>
         ///     <para>
-        ///         This event is in the <see cref="DbLoggerCategory.Model" /> category.
+        ///         This event is in the <see cref="DbLoggerCategory.Model.Validation" /> category.
         ///     </para>
         ///     <para>
         ///         This event uses the <see cref="ForeignKeyEventData" /> payload when used with a
         ///         <see cref="DiagnosticSource" />.
         ///     </para>
         /// </summary>
-        public static readonly EventId RedundantForeignKeyWarning = MakeModelId(Id.RedundantForeignKeyWarning);
+        public static readonly EventId RedundantForeignKeyWarning = MakeModelValidationId(Id.RedundantForeignKeyWarning);
+
+        /// <summary>
+        ///     <para>
+        ///         A <see cref="KeylessAttribute"/> attribute on the entity type is conflicting
+        ///         with a <see cref="KeyAttribute"/> attribute on at least one of its properties.
+        ///     </para>
+        ///     <para>
+        ///         This event is in the <see cref="DbLoggerCategory.Model" /> category.
+        ///     </para>
+        ///     <para>
+        ///         This event uses the <see cref="PropertyEventData" /> payload when used with a
+        ///         <see cref="DiagnosticSource" />.
+        ///     </para>
+        /// </summary>
+        public static readonly EventId ConflictingKeylessAndKeyAttributesWarning = MakeModelId(Id.ConflictingKeylessAndKeyAttributesWarning);
 
         private static readonly string _changeTrackingPrefix = DbLoggerCategory.ChangeTracking.Name + ".";
         private static EventId MakeChangeTrackingId(Id id) => new EventId((int)id, _changeTrackingPrefix + id);
@@ -791,7 +836,7 @@ namespace Microsoft.EntityFrameworkCore.Diagnostics
 
         /// <summary>
         ///     <para>
-        ///         An <see cref="OptimisticConcurrencyException"/> was thrown during the call to
+        ///         An <see cref="OptimisticConcurrencyException" /> was thrown during the call to
         ///         <see cref="DbContext.SaveChanges()" />
         ///     </para>
         ///     <para>
@@ -817,5 +862,18 @@ namespace Microsoft.EntityFrameworkCore.Diagnostics
         ///     </para>
         /// </summary>
         public static readonly EventId ContextDisposed = MakeInfraId(Id.ContextDisposed);
+
+        /// <summary>
+        ///     <para>
+        ///         A property has a collection or enumeration type with a value converter but with no value comparer.
+        ///     </para>
+        ///     <para>
+        ///         This event is in the <see cref="DbLoggerCategory.Model.Validation" /> category.
+        ///     </para>
+        ///     <para>
+        ///         This event uses the <see cref="PropertyEventData" /> payload when used with a <see cref="DiagnosticSource" />.
+        ///     </para>
+        /// </summary>
+        public static readonly EventId CollectionWithoutComparer = MakeModelValidationId(Id.CollectionWithoutComparer);
     }
 }

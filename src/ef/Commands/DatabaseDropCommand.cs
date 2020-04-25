@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
@@ -9,9 +9,9 @@ namespace Microsoft.EntityFrameworkCore.Tools.Commands
     // ReSharper disable once ArrangeTypeModifiers
     internal partial class DatabaseDropCommand
     {
-        protected override int Execute()
+        protected override int Execute(string[] args)
         {
-            var executor = CreateExecutor();
+            var executor = CreateExecutor(args);
 
             void LogDropCommand(Func<object, object, string> resource)
             {
@@ -40,7 +40,7 @@ namespace Microsoft.EntityFrameworkCore.Tools.Commands
 
             executor.DropDatabase(Context.Value());
 
-            return base.Execute();
+            return base.Execute(args);
         }
     }
 }

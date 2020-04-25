@@ -59,44 +59,16 @@ namespace Microsoft.EntityFrameworkCore.Migrations
         /// <param name="defaultValue"> The default value for the column. </param>
         /// <param name="defaultValueSql"> The SQL expression to use for the column's default constraint. </param>
         /// <param name="computedColumnSql"> The SQL expression to use to compute the column value. </param>
-        /// <returns> A builder to allow annotations to be added to the operation. </returns>
-        public virtual OperationBuilder<AddColumnOperation> AddColumn<T>(
-            [NotNull] string name,
-            [NotNull] string table,
-            [CanBeNull] string type,
-            bool? unicode,
-            int? maxLength,
-            bool rowVersion,
-            [CanBeNull] string schema,
-            bool nullable,
-            [CanBeNull] object defaultValue,
-            [CanBeNull] string defaultValueSql,
-            [CanBeNull] string computedColumnSql)
-            => AddColumn<T>(name, table, type, unicode, maxLength, rowVersion, schema, nullable, defaultValue, defaultValueSql, computedColumnSql, null);
-
-        /// <summary>
-        ///     Builds an <see cref="AddColumnOperation" /> to add a new column to a table.
-        /// </summary>
-        /// <typeparam name="T"> The CLR type that the column is mapped to. </typeparam>
-        /// <param name="name"> The column name. </param>
-        /// <param name="table"> The name of the table that contains the column. </param>
-        /// <param name="type"> The store/database type of the column. </param>
-        /// <param name="unicode">
-        ///     Indicates whether or not the column can contain Unicode data, or <c>null</c> if not specified or not applicable.
-        /// </param>
-        /// <param name="maxLength">
-        ///     The maximum length of data that can be stored in the column, or <c>null</c> if not specified or not applicable.
-        /// </param>
-        /// <param name="rowVersion">
-        ///     Indicates whether or not the column acts as an automatic concurrency token, such as a rowversion/timestamp column
-        ///     in SQL Server.
-        /// </param>
-        /// <param name="schema"> The schema that contains the table, or <c>null</c> if the default schema should be used. </param>
-        /// <param name="nullable"> Indicates whether or not the column can store <c>NULL</c> values. </param>
-        /// <param name="defaultValue"> The default value for the column. </param>
-        /// <param name="defaultValueSql"> The SQL expression to use for the column's default constraint. </param>
-        /// <param name="computedColumnSql"> The SQL expression to use to compute the column value. </param>
+        /// <param name="computedColumnIsStored"> Whether the value of the computed column is stored in the database or not. </param>
         /// <param name="fixedLength"> Indicates whether or not the column is constrained to fixed-length data. </param>
+        /// <param name="comment"> A comment to associate with the column. </param>
+        /// <param name="collation"> A collation to apply to the column. </param>
+        /// <param name="precision">
+        ///     The maximum number of digits that is allowed in this column, or <c>null</c> if not specified or not applicable.
+        /// </param>
+        /// <param name="scale">
+        ///     The maximum number of decimal places that is allowed in this column, or <c>null</c> if not specified or not applicable.
+        /// </param>
         /// <returns> A builder to allow annotations to be added to the operation. </returns>
         public virtual OperationBuilder<AddColumnOperation> AddColumn<T>(
             [NotNull] string name,
@@ -110,8 +82,12 @@ namespace Microsoft.EntityFrameworkCore.Migrations
             [CanBeNull] object defaultValue = null,
             [CanBeNull] string defaultValueSql = null,
             [CanBeNull] string computedColumnSql = null,
-            // ReSharper disable once MethodOverloadWithOptionalParameter (Avoiding binary break)
-            bool? fixedLength = null)
+            bool? computedColumnIsStored = null,
+            bool? fixedLength = null,
+            [CanBeNull] string comment = null,
+            [CanBeNull] string collation = null,
+            int? precision = null,
+            int? scale = null)
         {
             Check.NotEmpty(name, nameof(name));
             Check.NotEmpty(table, nameof(table));
@@ -130,7 +106,12 @@ namespace Microsoft.EntityFrameworkCore.Migrations
                 DefaultValue = defaultValue,
                 DefaultValueSql = defaultValueSql,
                 ComputedColumnSql = computedColumnSql,
-                IsFixedLength = fixedLength
+                ComputedColumnIsStored = computedColumnIsStored,
+                IsFixedLength = fixedLength,
+                Comment = comment,
+                Collation = collation,
+                Precision = precision,
+                Scale = scale,
             };
             Operations.Add(operation);
 
@@ -347,6 +328,7 @@ namespace Microsoft.EntityFrameworkCore.Migrations
         /// <param name="defaultValue"> The default value for the column. </param>
         /// <param name="defaultValueSql"> The SQL expression to use for the column's default constraint. </param>
         /// <param name="computedColumnSql"> The SQL expression to use to compute the column value. </param>
+        /// <param name="computedColumnIsStored"> Whether the value of the computed column is stored in the database or not. </param>
         /// <param name="oldClrType">
         ///     The CLR type that the column was previously mapped to. Can be <c>null</c>, in which case previous value is considered unknown.
         /// </param>
@@ -377,86 +359,25 @@ namespace Microsoft.EntityFrameworkCore.Migrations
         /// <param name="oldComputedColumnSql">
         ///     The previous SQL expression used to compute the column value. Can be <c>null</c>, in which case previous value is considered unknown.
         /// </param>
-        /// <returns> A builder to allow annotations to be added to the operation. </returns>
-        public virtual AlterOperationBuilder<AlterColumnOperation> AlterColumn<T>(
-            [NotNull] string name,
-            [NotNull] string table,
-            [CanBeNull] string type,
-            bool? unicode,
-            int? maxLength,
-            bool rowVersion,
-            [CanBeNull] string schema,
-            bool nullable,
-            [CanBeNull] object defaultValue,
-            [CanBeNull] string defaultValueSql,
-            [CanBeNull] string computedColumnSql,
-            [CanBeNull] Type oldClrType,
-            [CanBeNull] string oldType,
-            bool? oldUnicode,
-            int? oldMaxLength,
-            bool oldRowVersion,
-            bool oldNullable,
-            [CanBeNull] object oldDefaultValue,
-            [CanBeNull] string oldDefaultValueSql,
-            [CanBeNull] string oldComputedColumnSql)
-            => AlterColumn<T>(
-                name, table, type, unicode, maxLength, rowVersion, schema, nullable, defaultValue, defaultValueSql, computedColumnSql,
-                oldClrType, oldType, oldUnicode, oldMaxLength, oldRowVersion, oldNullable, oldDefaultValue, oldDefaultValueSql, oldComputedColumnSql, null, null);
-
-        /// <summary>
-        ///     Builds an <see cref="AlterColumnOperation" /> to alter an existing column.
-        /// </summary>
-        /// <typeparam name="T"> The CLR type that the column is mapped to. </typeparam>
-        /// <param name="name"> The column name. </param>
-        /// <param name="table"> The name of the table that contains the column. </param>
-        /// <param name="type"> The store/database type of the column. </param>
-        /// <param name="unicode">
-        ///     Indicates whether or not the column can contain Unicode data, or <c>null</c> if not specified or not applicable.
-        /// </param>
-        /// <param name="maxLength">
-        ///     The maximum length of data that can be stored in the column, or <c>null</c> if not specified or not applicable.
-        /// </param>
-        /// <param name="rowVersion">
-        ///     Indicates whether or not the column acts as an automatic concurrency token, such as a rowversion/timestamp column
-        ///     in SQL Server.
-        /// </param>
-        /// <param name="schema"> The schema that contains the table, or <c>null</c> if the default schema should be used. </param>
-        /// <param name="nullable"> Indicates whether or not the column can store <c>NULL</c> values. </param>
-        /// <param name="defaultValue"> The default value for the column. </param>
-        /// <param name="defaultValueSql"> The SQL expression to use for the column's default constraint. </param>
-        /// <param name="computedColumnSql"> The SQL expression to use to compute the column value. </param>
-        /// <param name="oldClrType">
-        ///     The CLR type that the column was previously mapped to. Can be <c>null</c>, in which case previous value is considered unknown.
-        /// </param>
-        /// <param name="oldType">
-        ///     The previous store/database type of the column. Can be <c>null</c>, in which case previous value is considered unknown.
-        /// </param>
-        /// <param name="oldUnicode">
-        ///     Indicates whether or not the column could previously contain Unicode data, or <c>null</c> if not specified or not applicable.
-        /// </param>
-        /// <param name="oldMaxLength">
-        ///     The previous maximum length of data that can be stored in the column, or <c>null</c> if not specified or not applicable.
-        /// </param>
-        /// <param name="oldRowVersion">
-        ///     Indicates whether or not the column previously acted as an automatic concurrency token, such as a rowversion/timestamp column
-        ///     in SQL Server. Can be <c>null</c>, in which case previous value is considered unknown.
-        /// </param>
-        /// <param name="oldNullable">
-        ///     Indicates whether or not the column could previously store <c>NULL</c> values. Can be <c>null</c>, in which case previous value is
-        ///     considered unknown.
-        /// </param>
-        /// <param name="oldDefaultValue">
-        ///     The previous default value for the column. Can be <c>null</c>, in which case previous value is considered unknown.
-        /// </param>
-        /// <param name="oldDefaultValueSql">
-        ///     The previous SQL expression used for the column's default constraint. Can be <c>null</c>, in which case previous value is considered
-        ///     unknown.
-        /// </param>
-        /// <param name="oldComputedColumnSql">
-        ///     The previous SQL expression used to compute the column value. Can be <c>null</c>, in which case previous value is considered unknown.
-        /// </param>
+        /// <param name="oldComputedColumnIsStored"> Whether the value of the previous computed column was stored in the database or not. </param>
         /// <param name="fixedLength"> Indicates whether or not the column is constrained to fixed-length data. </param>
         /// <param name="oldFixedLength"> Indicates whether or not the column was previously constrained to fixed-length data. </param>
+        /// <param name="comment"> A comment to associate with the column. </param>
+        /// <param name="oldComment"> The previous comment to associate with the column. </param>
+        /// <param name="collation"> A collation to apply to the column. </param>
+        /// <param name="oldCollation"> The previous collation to apply to the column. </param>
+        /// <param name="precision">
+        ///     The maximum number of digits that is allowed in this column, or <c>null</c> if not specified or not applicable.
+        /// </param>
+        /// <param name="oldPrecision">
+        ///     The previous maximum number of digits that is allowed in this column, or <c>null</c> if not specified or not applicable.
+        /// </param>
+        /// <param name="scale">
+        ///     The maximum number of decimal places that is allowed in this column, or <c>null</c> if not specified or not applicable.
+        /// </param>
+        /// <param name="oldScale">
+        ///     The previous maximum number of decimal places that is allowed in this column, or <c>null</c> if not specified or not applicable.
+        /// </param>
         /// <returns> A builder to allow annotations to be added to the operation. </returns>
         public virtual AlterOperationBuilder<AlterColumnOperation> AlterColumn<T>(
             [NotNull] string name,
@@ -470,6 +391,7 @@ namespace Microsoft.EntityFrameworkCore.Migrations
             [CanBeNull] object defaultValue = null,
             [CanBeNull] string defaultValueSql = null,
             [CanBeNull] string computedColumnSql = null,
+            bool? computedColumnIsStored = null,
             [CanBeNull] Type oldClrType = null,
             [CanBeNull] string oldType = null,
             bool? oldUnicode = null,
@@ -479,9 +401,17 @@ namespace Microsoft.EntityFrameworkCore.Migrations
             [CanBeNull] object oldDefaultValue = null,
             [CanBeNull] string oldDefaultValueSql = null,
             [CanBeNull] string oldComputedColumnSql = null,
-            // ReSharper disable once MethodOverloadWithOptionalParameter (Avoiding binary break)
+            bool? oldComputedColumnIsStored = null,
             bool? fixedLength = null,
-            bool? oldFixedLength = null)
+            bool? oldFixedLength = null,
+            [CanBeNull] string comment = null,
+            [CanBeNull] string oldComment = null,
+            [CanBeNull] string collation = null,
+            [CanBeNull] string oldCollation = null,
+            int? precision = null,
+            int? oldPrecision = null,
+            int? scale = null,
+            int? oldScale = null)
         {
             Check.NotEmpty(name, nameof(name));
             Check.NotEmpty(table, nameof(table));
@@ -500,7 +430,12 @@ namespace Microsoft.EntityFrameworkCore.Migrations
                 DefaultValue = defaultValue,
                 DefaultValueSql = defaultValueSql,
                 ComputedColumnSql = computedColumnSql,
+                ComputedColumnIsStored = computedColumnIsStored,
                 IsFixedLength = fixedLength,
+                Comment = comment,
+                Collation = collation,
+                Precision = precision,
+                Scale = scale,
                 OldColumn = new ColumnOperation
                 {
                     ClrType = oldClrType ?? typeof(T),
@@ -512,7 +447,12 @@ namespace Microsoft.EntityFrameworkCore.Migrations
                     DefaultValue = oldDefaultValue,
                     DefaultValueSql = oldDefaultValueSql,
                     ComputedColumnSql = oldComputedColumnSql,
-                    IsFixedLength = oldFixedLength
+                    ComputedColumnIsStored = oldComputedColumnIsStored,
+                    IsFixedLength = oldFixedLength,
+                    Comment = oldComment,
+                    Collation = oldCollation,
+                    Precision = oldPrecision,
+                    Scale = oldScale
                 }
             };
 
@@ -524,10 +464,17 @@ namespace Microsoft.EntityFrameworkCore.Migrations
         /// <summary>
         ///     Builds an <see cref="AlterDatabaseOperation" /> to alter an existing database.
         /// </summary>
+        /// <param name="collation"> A collation to apply to the column. </param>
+        /// <param name="oldCollation"> The previous collation to apply to the column. </param>
         /// <returns> A builder to allow annotations to be added to the operation. </returns>
-        public virtual AlterOperationBuilder<AlterDatabaseOperation> AlterDatabase()
+        public virtual AlterOperationBuilder<AlterDatabaseOperation> AlterDatabase(
+            [CanBeNull] string collation = null,
+            [CanBeNull] string oldCollation = null)
         {
-            var operation = new AlterDatabaseOperation();
+            var operation = new AlterDatabaseOperation
+            {
+                Collation = collation
+            };
             Operations.Add(operation);
 
             return new AlterOperationBuilder<AlterDatabaseOperation>(operation);
@@ -587,17 +534,23 @@ namespace Microsoft.EntityFrameworkCore.Migrations
         /// </summary>
         /// <param name="name"> The table name. </param>
         /// <param name="schema"> The schema that contains the table, or <c>null</c> to use the default schema. </param>
+        /// <param name="comment"> A comment to associate with the table. </param>
+        /// <param name="oldComment"> The previous comment to associate with the table. </param>
         /// <returns> A builder to allow annotations to be added to the operation. </returns>
         public virtual AlterOperationBuilder<AlterTableOperation> AlterTable(
             [NotNull] string name,
-            [CanBeNull] string schema = null)
+            [CanBeNull] string schema = null,
+            [CanBeNull] string comment = null,
+            [CanBeNull] string oldComment = null)
         {
             Check.NotEmpty(name, nameof(name));
 
             var operation = new AlterTableOperation
             {
                 Schema = schema,
-                Name = name
+                Name = name,
+                Comment = comment,
+                OldTable = new TableOperation { Comment = oldComment }
             };
             Operations.Add(operation);
 
@@ -675,10 +628,7 @@ namespace Microsoft.EntityFrameworkCore.Migrations
         {
             Check.NotEmpty(name, nameof(name));
 
-            var operation = new EnsureSchemaOperation
-            {
-                Name = name
-            };
+            var operation = new EnsureSchemaOperation { Name = name };
             Operations.Add(operation);
 
             return new OperationBuilder<EnsureSchemaOperation>(operation);
@@ -745,6 +695,34 @@ namespace Microsoft.EntityFrameworkCore.Migrations
         }
 
         /// <summary>
+        ///     Builds an <see cref="CreateCheckConstraintOperation" /> to create a new check constraint.
+        /// </summary>
+        /// <param name="name"> The check constraint name. </param>
+        /// <param name="table"> The name of the table for the check constraint. </param>
+        /// <param name="sql"> The constraint sql for the check constraint. </param>
+        /// <param name="schema"> The schema that contains the check constraint, or <c>null</c> to use the default schema. </param>
+        /// <returns> A builder to allow annotations to be added to the operation. </returns>
+        public virtual OperationBuilder<CreateCheckConstraintOperation> CreateCheckConstraint(
+            [NotNull] string name,
+            [NotNull] string table,
+            [NotNull] string sql,
+            [CanBeNull] string schema = null)
+        {
+            Check.NotEmpty(name, nameof(name));
+
+            var operation = new CreateCheckConstraintOperation
+            {
+                Schema = schema,
+                Name = name,
+                Table = table,
+                Sql = sql
+            };
+            Operations.Add(operation);
+
+            return new OperationBuilder<CreateCheckConstraintOperation>(operation);
+        }
+
+        /// <summary>
         ///     Builds an <see cref="CreateTableOperation" /> to create a new table.
         /// </summary>
         /// <typeparam name="TColumns"> Type of a typically anonymous type for building columns. </typeparam>
@@ -756,12 +734,14 @@ namespace Microsoft.EntityFrameworkCore.Migrations
         /// <param name="constraints">
         ///     A delegate allowing constraints to be applied over the columns configured by the 'columns' delegate above.
         /// </param>
+        /// <param name="comment"> A comment to be applied to the table. </param>
         /// <returns> A <see cref="CreateTableBuilder{TColumns}" /> to allow further configuration to be chained. </returns>
         public virtual CreateTableBuilder<TColumns> CreateTable<TColumns>(
             [NotNull] string name,
             [NotNull] Func<ColumnsBuilder, TColumns> columns,
             [CanBeNull] string schema = null,
-            [CanBeNull] Action<CreateTableBuilder<TColumns>> constraints = null)
+            [CanBeNull] Action<CreateTableBuilder<TColumns>> constraints = null,
+            [CanBeNull] string comment = null)
         {
             Check.NotEmpty(name, nameof(name));
             Check.NotNull(columns, nameof(columns));
@@ -769,12 +749,13 @@ namespace Microsoft.EntityFrameworkCore.Migrations
             var createTableOperation = new CreateTableOperation
             {
                 Schema = schema,
-                Name = name
+                Name = name,
+                Comment = comment
             };
 
             var columnsBuilder = new ColumnsBuilder(createTableOperation);
             var columnsObject = columns(columnsBuilder);
-            var columnMap = new Dictionary<PropertyInfo, AddColumnOperation>();
+            var columnMap = new Dictionary<MemberInfo, AddColumnOperation>();
             foreach (var property in typeof(TColumns).GetTypeInfo().DeclaredProperties)
             {
                 var addColumnOperation = ((IInfrastructure<AddColumnOperation>)property.GetMethod.Invoke(columnsObject, null)).Instance;
@@ -907,10 +888,7 @@ namespace Microsoft.EntityFrameworkCore.Migrations
         {
             Check.NotEmpty(name, nameof(name));
 
-            var operation = new DropSchemaOperation
-            {
-                Name = name
-            };
+            var operation = new DropSchemaOperation { Name = name };
             Operations.Add(operation);
 
             return new OperationBuilder<DropSchemaOperation>(operation);
@@ -928,14 +906,35 @@ namespace Microsoft.EntityFrameworkCore.Migrations
         {
             Check.NotEmpty(name, nameof(name));
 
-            var operation = new DropSequenceOperation
-            {
-                Schema = schema,
-                Name = name
-            };
+            var operation = new DropSequenceOperation { Schema = schema, Name = name };
             Operations.Add(operation);
 
             return new OperationBuilder<DropSequenceOperation>(operation);
+        }
+
+        /// <summary>
+        ///     Builds an <see cref="DropCheckConstraintOperation" /> to drop an existing check constraint.
+        /// </summary>
+        /// <param name="name"> The name of the check constraint to drop. </param>
+        /// <param name="table"> The name of the table for the check constraint to drop. </param>
+        /// <param name="schema"> The schema that contains the check constraint, or <c>null</c> to use the default schema. </param>
+        /// <returns> A builder to allow annotations to be added to the operation. </returns>
+        public virtual OperationBuilder<DropCheckConstraintOperation> DropCheckConstraint(
+            [NotNull] string name,
+            [NotNull] string table,
+            [CanBeNull] string schema = null)
+        {
+            Check.NotEmpty(name, nameof(name));
+
+            var operation = new DropCheckConstraintOperation
+            {
+                Name = name,
+                Table = table,
+                Schema = schema
+            };
+            Operations.Add(operation);
+
+            return new OperationBuilder<DropCheckConstraintOperation>(operation);
         }
 
         /// <summary>
@@ -950,11 +949,7 @@ namespace Microsoft.EntityFrameworkCore.Migrations
         {
             Check.NotEmpty(name, nameof(name));
 
-            var operation = new DropTableOperation
-            {
-                Schema = schema,
-                Name = name
-            };
+            var operation = new DropTableOperation { Schema = schema, Name = name };
             Operations.Add(operation);
 
             return new OperationBuilder<DropTableOperation>(operation);
@@ -1079,7 +1074,7 @@ namespace Microsoft.EntityFrameworkCore.Migrations
         /// <param name="name"> The name of the table to be renamed.</param>
         /// <param name="schema"> The schema that contains the table, or <c>null</c> to use the default schema. </param>
         /// <param name="newName"> The new table name or <c>null</c> if only the schema has changed. </param>
-        /// <param name="newSchema"> The new schema name or <c>null</c> if only the name has changed. </param>
+        /// <param name="newSchema"> The new schema name, or <c>null</c> to use the default schema. </param>
         /// <returns> A builder to allow annotations to be added to the operation. </returns>
         public virtual OperationBuilder<RenameTableOperation> RenameTable(
             [NotNull] string name,
@@ -1140,11 +1135,7 @@ namespace Microsoft.EntityFrameworkCore.Migrations
         {
             Check.NotEmpty(sql, nameof(sql));
 
-            var operation = new SqlOperation
-            {
-                Sql = sql,
-                SuppressTransaction = suppressTransaction
-            };
+            var operation = new SqlOperation { Sql = sql, SuppressTransaction = suppressTransaction };
             Operations.Add(operation);
 
             return new OperationBuilder<SqlOperation>(operation);
@@ -1235,7 +1226,7 @@ namespace Microsoft.EntityFrameworkCore.Migrations
         /// <summary>
         ///     Builds an <see cref="DeleteDataOperation" /> to delete a single row of seed data.
         /// </summary>
-        /// <param name="table"> The table into which the data will be inserted. </param>
+        /// <param name="table"> The table from which the data will be deleted. </param>
         /// <param name="keyColumn"> The name of the key column used to select the row to delete. </param>
         /// <param name="keyValue"> The key value of the row to delete. </param>
         /// <param name="schema"> The schema that contains the table, or <c>null</c> to use the default schema. </param>
@@ -1251,7 +1242,7 @@ namespace Microsoft.EntityFrameworkCore.Migrations
         ///     Builds an <see cref="DeleteDataOperation" /> to delete a single row of seed data from
         ///     a table with a composite (multi-column) key.
         /// </summary>
-        /// <param name="table"> The table into which the data will be inserted. </param>
+        /// <param name="table"> The table from which the data will be deleted. </param>
         /// <param name="keyColumns"> The names of the key columns used to select the row to delete. </param>
         /// <param name="keyValues"> The key values of the row to delete, one value for each column in 'keyColumns'. </param>
         /// <param name="schema"> The schema that contains the table, or <c>null</c> to use the default schema. </param>
@@ -1270,7 +1261,7 @@ namespace Microsoft.EntityFrameworkCore.Migrations
         /// <summary>
         ///     Builds an <see cref="DeleteDataOperation" /> to delete multiple rows of seed data.
         /// </summary>
-        /// <param name="table"> The table into which the data will be inserted. </param>
+        /// <param name="table"> The table from which the data will be deleted. </param>
         /// <param name="keyColumn"> The name of the key column used to select the row to delete. </param>
         /// <param name="keyValues"> The key values of the rows to delete, one value per row. </param>
         /// <param name="schema"> The schema that contains the table, or <c>null</c> to use the default schema. </param>
@@ -1290,7 +1281,7 @@ namespace Microsoft.EntityFrameworkCore.Migrations
         ///     Builds an <see cref="DeleteDataOperation" /> to delete multiple rows of seed data from
         ///     a table with a composite (multi-column) key.
         /// </summary>
-        /// <param name="table"> The table into which the data will be inserted. </param>
+        /// <param name="table"> The table from which the data will be deleted. </param>
         /// <param name="keyColumns"> The names of the key columns used to select the rows to delete. </param>
         /// <param name="keyValues">
         ///     The key values of the rows to delete, where each element of the outer array represents a row, and each inner array contains values for

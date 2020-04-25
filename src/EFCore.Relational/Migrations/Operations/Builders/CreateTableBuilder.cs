@@ -7,7 +7,7 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 using JetBrains.Annotations;
-using Microsoft.EntityFrameworkCore.Internal;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Utilities;
 
 namespace Microsoft.EntityFrameworkCore.Migrations.Operations.Builders
@@ -18,7 +18,7 @@ namespace Microsoft.EntityFrameworkCore.Migrations.Operations.Builders
     /// <typeparam name="TColumns"> Type of a typically anonymous type for building columns. </typeparam>
     public class CreateTableBuilder<TColumns> : OperationBuilder<CreateTableOperation>
     {
-        private readonly IReadOnlyDictionary<PropertyInfo, AddColumnOperation> _columnMap;
+        private readonly IReadOnlyDictionary<MemberInfo, AddColumnOperation> _columnMap;
 
         /// <summary>
         ///     Constructs a new builder for the given <see cref="CreateTableOperation" /> and
@@ -28,7 +28,7 @@ namespace Microsoft.EntityFrameworkCore.Migrations.Operations.Builders
         /// <param name="columnMap"> The map of CLR properties to <see cref="AddColumnOperation" />s. </param>
         public CreateTableBuilder(
             [NotNull] CreateTableOperation operation,
-            [NotNull] IReadOnlyDictionary<PropertyInfo, AddColumnOperation> columnMap)
+            [NotNull] IReadOnlyDictionary<MemberInfo, AddColumnOperation> columnMap)
             : base(operation)
         {
             Check.NotNull(columnMap, nameof(columnMap));
@@ -157,6 +157,31 @@ namespace Microsoft.EntityFrameworkCore.Migrations.Operations.Builders
         }
 
         /// <summary>
+        ///     Configures a check constraint on the table.
+        /// </summary>
+        /// <param name="name"> The constraint name. </param>
+        /// <param name="sql"> The sql expression used in the CHECK constraint. </param>
+        /// <returns> The same builder so that multiple calls can be chained. </returns>
+        public virtual OperationBuilder<CreateCheckConstraintOperation> CheckConstraint(
+            [NotNull] string name,
+            [NotNull] string sql)
+        {
+            Check.NotEmpty(name, nameof(name));
+            Check.NotNull(sql, nameof(sql));
+
+            var operation = new CreateCheckConstraintOperation
+            {
+                Schema = Operation.Schema,
+                Table = Operation.Name,
+                Name = name,
+                Sql = sql
+            };
+            Operation.CheckConstraints.Add(operation);
+
+            return new OperationBuilder<CreateCheckConstraintOperation>(operation);
+        }
+
+        /// <summary>
         ///     Annotates the operation with the given name/value pair.
         /// </summary>
         /// <param name="name"> The annotation name. </param>
@@ -166,6 +191,6 @@ namespace Microsoft.EntityFrameworkCore.Migrations.Operations.Builders
             => (CreateTableBuilder<TColumns>)base.Annotation(name, value);
 
         private string[] Map(LambdaExpression columns)
-            => columns.GetPropertyAccessList().Select(c => _columnMap[c].Name).ToArray();
+            => columns.GetMemberAccessList().Select(c => _columnMap[c].Name).ToArray();
     }
 }

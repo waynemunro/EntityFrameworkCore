@@ -1,10 +1,10 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using JetBrains.Annotations;
 using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Query.ExpressionTranslators;
-using Microsoft.EntityFrameworkCore.SqlServer.Query.ExpressionTranslators.Internal;
+using Microsoft.EntityFrameworkCore.Query;
+using Microsoft.EntityFrameworkCore.SqlServer.Query.Internal;
 using Microsoft.EntityFrameworkCore.SqlServer.Storage.Internal;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.Utilities;

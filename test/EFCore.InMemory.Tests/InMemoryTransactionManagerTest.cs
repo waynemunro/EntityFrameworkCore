@@ -2,14 +2,14 @@
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.EntityFrameworkCore.Diagnostics.Internal;
+using Microsoft.EntityFrameworkCore.InMemory.Diagnostics.Internal;
 using Microsoft.EntityFrameworkCore.InMemory.Internal;
 using Microsoft.EntityFrameworkCore.InMemory.Storage.Internal;
 using Microsoft.EntityFrameworkCore.Internal;
 using Microsoft.EntityFrameworkCore.TestUtilities;
-using Microsoft.Extensions.Logging;
 using Xunit;
 
 // ReSharper disable InconsistentNaming
@@ -17,7 +17,7 @@ namespace Microsoft.EntityFrameworkCore
 {
     public class InMemoryTransactionManagerTest
     {
-        [Fact]
+        [ConditionalFact]
         public void CurrentTransaction_returns_null()
         {
             var transactionManager = new InMemoryTransactionManager(CreateLogger());
@@ -25,36 +25,36 @@ namespace Microsoft.EntityFrameworkCore
             Assert.Null(transactionManager.CurrentTransaction);
         }
 
-        [Fact]
+        [ConditionalFact]
         public void Throws_on_BeginTransaction()
-        {
-            AssertThrows(() => new InMemoryTransactionManager(CreateLogger()).BeginTransaction());
-        }
+            => AssertThrows(() => new InMemoryTransactionManager(CreateLogger()).BeginTransaction());
 
-        [Fact]
+        [ConditionalFact]
         public void Throws_on_BeginTransactionAsync()
-        {
-            AssertThrows(() => new InMemoryTransactionManager(CreateLogger()).BeginTransactionAsync().GetAwaiter().GetResult());
-        }
+            => AssertThrows(() => new InMemoryTransactionManager(CreateLogger()).BeginTransactionAsync().GetAwaiter().GetResult());
 
-        [Fact]
+        [ConditionalFact]
         public void Throws_on_CommitTransaction()
-        {
-            AssertThrows(() => new InMemoryTransactionManager(CreateLogger()).CommitTransaction());
-        }
+            => AssertThrows(() => new InMemoryTransactionManager(CreateLogger()).CommitTransaction());
 
-        [Fact]
+        [ConditionalFact]
+        public void Throws_on_CommitTransactionAsync()
+            => AssertThrows(() => new InMemoryTransactionManager(CreateLogger()).CommitTransactionAsync().GetAwaiter().GetResult());
+
+        [ConditionalFact]
         public void Throws_on_RollbackTransaction()
-        {
-            AssertThrows(() => new InMemoryTransactionManager(CreateLogger()).RollbackTransaction());
-        }
+            => AssertThrows(() => new InMemoryTransactionManager(CreateLogger()).RollbackTransaction());
+
+        [ConditionalFact]
+        public void Throws_on_RollbackTransactionAsync()
+            => AssertThrows(() => new InMemoryTransactionManager(CreateLogger()).RollbackTransactionAsync().GetAwaiter().GetResult());
 
         private static void AssertThrows(Action action)
         {
             Assert.Equal(
                 CoreStrings.WarningAsErrorTemplate(
                     InMemoryEventId.TransactionIgnoredWarning,
-                    InMemoryStrings.LogTransactionsNotSupported.GenerateMessage(),
+                    InMemoryResources.LogTransactionsNotSupported(new TestLogger<InMemoryLoggingDefinitions>()).GenerateMessage(),
                     "InMemoryEventId.TransactionIgnoredWarning"),
                 Assert.Throws<InvalidOperationException>(action).Message);
         }
@@ -66,7 +66,9 @@ namespace Microsoft.EntityFrameworkCore
             var logger = new DiagnosticsLogger<DbLoggerCategory.Database.Transaction>(
                 new ListLoggerFactory(l => false),
                 options,
-                new DiagnosticListener("Fake"));
+                new DiagnosticListener("Fake"),
+                new InMemoryLoggingDefinitions(),
+                new NullDbContextLogger());
             return logger;
         }
     }

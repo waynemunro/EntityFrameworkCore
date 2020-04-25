@@ -7,7 +7,7 @@ using System.Linq;
 using JetBrains.Annotations;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.EntityFrameworkCore.Design.Internal;
-using Microsoft.EntityFrameworkCore.Internal;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Migrations.Operations;
 using Microsoft.EntityFrameworkCore.Utilities;
@@ -73,10 +73,7 @@ namespace Microsoft.EntityFrameworkCore.Migrations.Design
             Check.NotNull(downOperations, nameof(downOperations));
 
             var builder = new IndentedStringBuilder();
-            var namespaces = new List<string>
-            {
-                "Microsoft.EntityFrameworkCore.Migrations"
-            };
+            var namespaces = new List<string> { "Microsoft.EntityFrameworkCore.Migrations" };
             namespaces.AddRange(GetNamespaces(upOperations.Concat(downOperations)));
             foreach (var n in namespaces.OrderBy(x => x, new NamespaceComparer()).Distinct())
             {
@@ -141,7 +138,7 @@ namespace Microsoft.EntityFrameworkCore.Migrations.Design
         /// <param name="contextType"> The migration's <see cref="DbContext" /> type. </param>
         /// <param name="migrationName"> The migration's name. </param>
         /// <param name="migrationId"> The migration's ID. </param>
-        /// <param name="targetModel"> The migraiton's target model. </param>
+        /// <param name="targetModel"> The migration's target model. </param>
         /// <returns> The migration metadata code. </returns>
         public override string GenerateMetadata(
             string migrationNamespace,

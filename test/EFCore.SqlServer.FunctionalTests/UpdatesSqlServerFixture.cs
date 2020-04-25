@@ -16,7 +16,17 @@ namespace Microsoft.EntityFrameworkCore
 
             modelBuilder.Entity<Product>()
                 .Property(p => p.Price).HasColumnType("decimal(18,2)");
-            modelBuilder.Entity<LoginEntityTypeWithAnExtremelyLongAndOverlyConvolutedNameThatIsUsedToVerifyThatTheStoreIdentifierGenerationLengthLimitIsWorkingCorrectly>()
+
+            modelBuilder.Entity<ProductTableWithView>()
+                .Property(p => p.Price).HasColumnType("decimal(18,2)");
+            modelBuilder.Entity<ProductViewTable>()
+                .Property(p => p.Price).HasColumnType("decimal(18,2)");
+            modelBuilder.Entity<ProductTableView>()
+                .Property(p => p.Price).HasColumnType("decimal(18,2)");
+            modelBuilder
+                .Entity<
+                    LoginEntityTypeWithAnExtremelyLongAndOverlyConvolutedNameThatIsUsedToVerifyThatTheStoreIdentifierGenerationLengthLimitIsWorkingCorrectly
+                >()
                 .Property(l => l.ProfileId3).HasColumnType("decimal(18,2)");
 
             modelBuilder.Entity<Profile>()

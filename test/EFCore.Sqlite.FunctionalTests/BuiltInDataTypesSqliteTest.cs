@@ -6,7 +6,7 @@ using System.Linq;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
-using Microsoft.EntityFrameworkCore.Metadata.Internal;
+using Microsoft.EntityFrameworkCore.Sqlite.Internal;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 using Xunit;
@@ -25,17 +25,13 @@ namespace Microsoft.EntityFrameworkCore
             //fixture.TestSqlLoggerFactory.SetTestOutputHelper(testOutputHelper);
         }
 
-        [Fact]
+        [ConditionalFact]
         public virtual void Can_insert_and_query_decimal()
         {
             using (var context = CreateContext())
             {
                 context.Set<BuiltInNullableDataTypes>().Add(
-                    new BuiltInNullableDataTypes
-                    {
-                        Id = 14,
-                        TestNullableDecimal = 3m
-                    });
+                    new BuiltInNullableDataTypes { Id = 14, TestNullableDecimal = 3m });
 
                 Assert.Equal(1, context.SaveChanges());
             }
@@ -48,7 +44,7 @@ namespace Microsoft.EntityFrameworkCore
             }
         }
 
-        [Fact]
+        [ConditionalFact]
         public virtual void Can_insert_and_read_back_all_mapped_data_types()
         {
             using (var context = CreateContext())
@@ -86,7 +82,7 @@ namespace Microsoft.EntityFrameworkCore
                 Blob = new byte[] { 86 }
             };
 
-        [Fact]
+        [ConditionalFact]
         public virtual void Can_insert_and_read_back_all_mapped_nullable_data_types()
         {
             using (var context = CreateContext())
@@ -124,16 +120,13 @@ namespace Microsoft.EntityFrameworkCore
                 Blob = new byte[] { 86 }
             };
 
-        [Fact]
+        [ConditionalFact]
         public virtual void Can_insert_and_read_back_all_mapped_data_types_set_to_null()
         {
             using (var context = CreateContext())
             {
                 context.Set<MappedNullableDataTypes>().Add(
-                    new MappedNullableDataTypes
-                    {
-                        Id = 78
-                    });
+                    new MappedNullableDataTypes { Id = 78 });
 
                 Assert.Equal(1, context.SaveChanges());
             }
@@ -155,7 +148,7 @@ namespace Microsoft.EntityFrameworkCore
             Assert.Null(entity.Int);
         }
 
-        [Fact]
+        [ConditionalFact]
         public virtual void Can_insert_and_read_back_all_mapped_sized_data_types()
         {
             // Size expected to be ignored, but everything should still work
@@ -188,16 +181,13 @@ namespace Microsoft.EntityFrameworkCore
                 Binary = new byte[] { 10, 11, 12, 13 }
             };
 
-        [Fact]
+        [ConditionalFact]
         public virtual void Can_insert_and_read_back_nulls_for_all_mapped_sized_data_types()
         {
             using (var context = CreateContext())
             {
                 context.Set<MappedSizedDataTypes>().Add(
-                    new MappedSizedDataTypes
-                    {
-                        Id = 78
-                    });
+                    new MappedSizedDataTypes { Id = 78 });
 
                 Assert.Equal(1, context.SaveChanges());
             }
@@ -215,7 +205,7 @@ namespace Microsoft.EntityFrameworkCore
             Assert.Null(entity.Binary);
         }
 
-        [Fact]
+        [ConditionalFact]
         public virtual void Can_insert_and_read_back_all_mapped_data_types_with_scale()
         {
             // Scale expected to be ignored, but everything should still work
@@ -252,7 +242,7 @@ namespace Microsoft.EntityFrameworkCore
                 Decimal = 101.1m
             };
 
-        [Fact]
+        [ConditionalFact]
         public virtual void Can_insert_and_read_back_all_mapped_data_types_with_precision_and_scale()
         {
             // Precision and scale expected to be ignored, but everything should still work
@@ -260,11 +250,7 @@ namespace Microsoft.EntityFrameworkCore
             using (var context = CreateContext())
             {
                 context.Set<MappedPrecisionAndScaledDataTypes>().Add(
-                    new MappedPrecisionAndScaledDataTypes
-                    {
-                        Id = 77,
-                        Decimal = 101.1m
-                    });
+                    new MappedPrecisionAndScaledDataTypes { Id = 77, Decimal = 101.1m });
 
                 Assert.Equal(1, context.SaveChanges());
             }
@@ -277,7 +263,7 @@ namespace Microsoft.EntityFrameworkCore
             }
         }
 
-        [Fact]
+        [ConditionalFact]
         public virtual void Can_insert_and_read_back_all_mapped_data_types_with_Identity()
         {
             using (var context = CreateContext())
@@ -315,7 +301,7 @@ namespace Microsoft.EntityFrameworkCore
                 Blob = new byte[] { 86 }
             };
 
-        [Fact]
+        [ConditionalFact]
         public virtual void Can_insert_and_read_back_all_mapped_nullable_data_types_with_Identity()
         {
             using (var context = CreateContext())
@@ -327,7 +313,8 @@ namespace Microsoft.EntityFrameworkCore
 
             using (var context = CreateContext())
             {
-                AssertMappedNullableDataTypesWithIdentity(context.Set<MappedNullableDataTypesWithIdentity>().Single(e => e.AltId == 69), 69);
+                AssertMappedNullableDataTypesWithIdentity(
+                    context.Set<MappedNullableDataTypesWithIdentity>().Single(e => e.AltId == 69), 69);
             }
         }
 
@@ -353,23 +340,21 @@ namespace Microsoft.EntityFrameworkCore
                 Blob = new byte[] { 86 }
             };
 
-        [Fact]
+        [ConditionalFact]
         public virtual void Can_insert_and_read_back_all_mapped_data_types_set_to_null_with_Identity()
         {
             using (var context = CreateContext())
             {
                 context.Set<MappedNullableDataTypesWithIdentity>().Add(
-                    new MappedNullableDataTypesWithIdentity
-                    {
-                        AltId = 78
-                    });
+                    new MappedNullableDataTypesWithIdentity { AltId = 78 });
 
                 Assert.Equal(1, context.SaveChanges());
             }
 
             using (var context = CreateContext())
             {
-                AssertNullMappedNullableDataTypesWithIdentity(context.Set<MappedNullableDataTypesWithIdentity>().Single(e => e.AltId == 78), 78);
+                AssertNullMappedNullableDataTypesWithIdentity(
+                    context.Set<MappedNullableDataTypesWithIdentity>().Single(e => e.AltId == 78), 78);
             }
         }
 
@@ -384,7 +369,7 @@ namespace Microsoft.EntityFrameworkCore
             Assert.Null(entity.Int);
         }
 
-        [Fact]
+        [ConditionalFact]
         public virtual void Can_insert_and_read_back_all_mapped_sized_data_types_with_Identity()
         {
             // Size expected to be ignored, but everything should still work
@@ -417,16 +402,13 @@ namespace Microsoft.EntityFrameworkCore
                 Binary = new byte[] { 10, 11, 12, 13 }
             };
 
-        [Fact]
+        [ConditionalFact]
         public virtual void Can_insert_and_read_back_nulls_for_all_mapped_sized_data_types_with_Identity()
         {
             using (var context = CreateContext())
             {
                 context.Set<MappedSizedDataTypesWithIdentity>().Add(
-                    new MappedSizedDataTypesWithIdentity
-                    {
-                        AltId = 78
-                    });
+                    new MappedSizedDataTypesWithIdentity { AltId = 78 });
 
                 Assert.Equal(1, context.SaveChanges());
             }
@@ -444,7 +426,7 @@ namespace Microsoft.EntityFrameworkCore
             Assert.Null(entity.Binary);
         }
 
-        [Fact]
+        [ConditionalFact]
         public virtual void Can_insert_and_read_back_all_mapped_data_types_with_scale_with_Identity()
         {
             // Scale expected to be ignored, but everything should still work
@@ -481,7 +463,7 @@ namespace Microsoft.EntityFrameworkCore
                 Decimal = 101.1m
             };
 
-        [Fact]
+        [ConditionalFact]
         public virtual void Can_insert_and_read_back_all_mapped_data_types_with_precision_and_scale_with_Identity()
         {
             // Precision and scale expected to be ignored, but everything should still work
@@ -489,11 +471,7 @@ namespace Microsoft.EntityFrameworkCore
             using (var context = CreateContext())
             {
                 context.Set<MappedPrecisionAndScaledDataTypesWithIdentity>().Add(
-                    new MappedPrecisionAndScaledDataTypesWithIdentity
-                    {
-                        AltId = 77,
-                        Decimal = 101.1m
-                    });
+                    new MappedPrecisionAndScaledDataTypesWithIdentity { AltId = 77, Decimal = 101.1m });
 
                 Assert.Equal(1, context.SaveChanges());
             }
@@ -506,7 +484,7 @@ namespace Microsoft.EntityFrameworkCore
             }
         }
 
-        [Fact]
+        [ConditionalFact]
         public virtual void Can_insert_and_read_back_all_mapped_data_types_in_batch()
         {
             using (var context = CreateContext())
@@ -526,7 +504,7 @@ namespace Microsoft.EntityFrameworkCore
             }
         }
 
-        [Fact]
+        [ConditionalFact]
         public virtual void Can_insert_and_read_back_all_mapped_nullable_data_types_in_batch()
         {
             using (var context = CreateContext())
@@ -546,26 +524,17 @@ namespace Microsoft.EntityFrameworkCore
             }
         }
 
-        [Fact]
+        [ConditionalFact]
         public virtual void Can_insert_and_read_back_all_mapped_data_types_set_to_null_in_batch()
         {
             using (var context = CreateContext())
             {
                 context.Set<MappedNullableDataTypes>().Add(
-                    new MappedNullableDataTypes
-                    {
-                        Id = 278
-                    });
+                    new MappedNullableDataTypes { Id = 278 });
                 context.Set<MappedNullableDataTypes>().Add(
-                    new MappedNullableDataTypes
-                    {
-                        Id = 279
-                    });
+                    new MappedNullableDataTypes { Id = 279 });
                 context.Set<MappedNullableDataTypes>().Add(
-                    new MappedNullableDataTypes
-                    {
-                        Id = 280
-                    });
+                    new MappedNullableDataTypes { Id = 280 });
 
                 Assert.Equal(3, context.SaveChanges());
             }
@@ -578,7 +547,7 @@ namespace Microsoft.EntityFrameworkCore
             }
         }
 
-        [Fact]
+        [ConditionalFact]
         public virtual void Can_insert_and_read_back_all_mapped_sized_data_types_in_batch()
         {
             // Size expected to be ignored, but everything should still work
@@ -600,26 +569,17 @@ namespace Microsoft.EntityFrameworkCore
             }
         }
 
-        [Fact]
+        [ConditionalFact]
         public virtual void Can_insert_and_read_back_nulls_for_all_mapped_sized_data_types_in_batch()
         {
             using (var context = CreateContext())
             {
                 context.Set<MappedSizedDataTypes>().Add(
-                    new MappedSizedDataTypes
-                    {
-                        Id = 278
-                    });
+                    new MappedSizedDataTypes { Id = 278 });
                 context.Set<MappedSizedDataTypes>().Add(
-                    new MappedSizedDataTypes
-                    {
-                        Id = 279
-                    });
+                    new MappedSizedDataTypes { Id = 279 });
                 context.Set<MappedSizedDataTypes>().Add(
-                    new MappedSizedDataTypes
-                    {
-                        Id = 280
-                    });
+                    new MappedSizedDataTypes { Id = 280 });
 
                 Assert.Equal(3, context.SaveChanges());
             }
@@ -632,7 +592,7 @@ namespace Microsoft.EntityFrameworkCore
             }
         }
 
-        [Fact]
+        [ConditionalFact]
         public virtual void Can_insert_and_read_back_all_mapped_data_types_with_scale_in_batch()
         {
             // Scale expected to be ignored, but everything should still work
@@ -654,7 +614,7 @@ namespace Microsoft.EntityFrameworkCore
             }
         }
 
-        [Fact]
+        [ConditionalFact]
         public virtual void Can_insert_and_read_back_all_mapped_data_types_with_precision_and_scale_in_batch()
         {
             // Precision and scale expected to be ignored, but everything should still work
@@ -662,23 +622,11 @@ namespace Microsoft.EntityFrameworkCore
             using (var context = CreateContext())
             {
                 context.Set<MappedPrecisionAndScaledDataTypes>().Add(
-                    new MappedPrecisionAndScaledDataTypes
-                    {
-                        Id = 177,
-                        Decimal = 101.1m
-                    });
+                    new MappedPrecisionAndScaledDataTypes { Id = 177, Decimal = 101.1m });
                 context.Set<MappedPrecisionAndScaledDataTypes>().Add(
-                    new MappedPrecisionAndScaledDataTypes
-                    {
-                        Id = 178,
-                        Decimal = 101.1m
-                    });
+                    new MappedPrecisionAndScaledDataTypes { Id = 178, Decimal = 101.1m });
                 context.Set<MappedPrecisionAndScaledDataTypes>().Add(
-                    new MappedPrecisionAndScaledDataTypes
-                    {
-                        Id = 179,
-                        Decimal = 101.1m
-                    });
+                    new MappedPrecisionAndScaledDataTypes { Id = 179, Decimal = 101.1m });
 
                 Assert.Equal(3, context.SaveChanges());
             }
@@ -699,7 +647,7 @@ namespace Microsoft.EntityFrameworkCore
             }
         }
 
-        [Fact]
+        [ConditionalFact]
         public virtual void Can_insert_and_read_back_all_mapped_data_types_with_Identity_in_batch()
         {
             using (var context = CreateContext())
@@ -719,7 +667,7 @@ namespace Microsoft.EntityFrameworkCore
             }
         }
 
-        [Fact]
+        [ConditionalFact]
         public virtual void Can_insert_and_read_back_all_mapped_nullable_data_types_with_Identity_in_batch()
         {
             using (var context = CreateContext())
@@ -733,45 +681,42 @@ namespace Microsoft.EntityFrameworkCore
 
             using (var context = CreateContext())
             {
-                AssertMappedNullableDataTypesWithIdentity(context.Set<MappedNullableDataTypesWithIdentity>().Single(e => e.AltId == 169), 169);
-                AssertMappedNullableDataTypesWithIdentity(context.Set<MappedNullableDataTypesWithIdentity>().Single(e => e.AltId == 170), 170);
-                AssertMappedNullableDataTypesWithIdentity(context.Set<MappedNullableDataTypesWithIdentity>().Single(e => e.AltId == 171), 171);
+                AssertMappedNullableDataTypesWithIdentity(
+                    context.Set<MappedNullableDataTypesWithIdentity>().Single(e => e.AltId == 169), 169);
+                AssertMappedNullableDataTypesWithIdentity(
+                    context.Set<MappedNullableDataTypesWithIdentity>().Single(e => e.AltId == 170), 170);
+                AssertMappedNullableDataTypesWithIdentity(
+                    context.Set<MappedNullableDataTypesWithIdentity>().Single(e => e.AltId == 171), 171);
             }
         }
 
-        [Fact]
+        [ConditionalFact]
         public virtual void Can_insert_and_read_back_all_mapped_data_types_set_to_null_with_Identity_in_batch()
         {
             using (var context = CreateContext())
             {
                 context.Set<MappedNullableDataTypesWithIdentity>().Add(
-                    new MappedNullableDataTypesWithIdentity
-                    {
-                        AltId = 278
-                    });
+                    new MappedNullableDataTypesWithIdentity { AltId = 278 });
                 context.Set<MappedNullableDataTypesWithIdentity>().Add(
-                    new MappedNullableDataTypesWithIdentity
-                    {
-                        AltId = 279
-                    });
+                    new MappedNullableDataTypesWithIdentity { AltId = 279 });
                 context.Set<MappedNullableDataTypesWithIdentity>().Add(
-                    new MappedNullableDataTypesWithIdentity
-                    {
-                        AltId = 280
-                    });
+                    new MappedNullableDataTypesWithIdentity { AltId = 280 });
 
                 Assert.Equal(3, context.SaveChanges());
             }
 
             using (var context = CreateContext())
             {
-                AssertNullMappedNullableDataTypesWithIdentity(context.Set<MappedNullableDataTypesWithIdentity>().Single(e => e.AltId == 278), 278);
-                AssertNullMappedNullableDataTypesWithIdentity(context.Set<MappedNullableDataTypesWithIdentity>().Single(e => e.AltId == 279), 279);
-                AssertNullMappedNullableDataTypesWithIdentity(context.Set<MappedNullableDataTypesWithIdentity>().Single(e => e.AltId == 280), 280);
+                AssertNullMappedNullableDataTypesWithIdentity(
+                    context.Set<MappedNullableDataTypesWithIdentity>().Single(e => e.AltId == 278), 278);
+                AssertNullMappedNullableDataTypesWithIdentity(
+                    context.Set<MappedNullableDataTypesWithIdentity>().Single(e => e.AltId == 279), 279);
+                AssertNullMappedNullableDataTypesWithIdentity(
+                    context.Set<MappedNullableDataTypesWithIdentity>().Single(e => e.AltId == 280), 280);
             }
         }
 
-        [Fact]
+        [ConditionalFact]
         public virtual void Can_insert_and_read_back_all_mapped_sized_data_types_with_Identity_in_batch()
         {
             // Size expected to be ignored, but everything should still work
@@ -793,39 +738,33 @@ namespace Microsoft.EntityFrameworkCore
             }
         }
 
-        [Fact]
+        [ConditionalFact]
         public virtual void Can_insert_and_read_back_nulls_for_all_mapped_sized_data_types_with_Identity_in_batch()
         {
             using (var context = CreateContext())
             {
                 context.Set<MappedSizedDataTypesWithIdentity>().Add(
-                    new MappedSizedDataTypesWithIdentity
-                    {
-                        AltId = 278
-                    });
+                    new MappedSizedDataTypesWithIdentity { AltId = 278 });
                 context.Set<MappedSizedDataTypesWithIdentity>().Add(
-                    new MappedSizedDataTypesWithIdentity
-                    {
-                        AltId = 279
-                    });
+                    new MappedSizedDataTypesWithIdentity { AltId = 279 });
                 context.Set<MappedSizedDataTypesWithIdentity>().Add(
-                    new MappedSizedDataTypesWithIdentity
-                    {
-                        AltId = 280
-                    });
+                    new MappedSizedDataTypesWithIdentity { AltId = 280 });
 
                 Assert.Equal(3, context.SaveChanges());
             }
 
             using (var context = CreateContext())
             {
-                AssertNullMappedSizedDataTypesWithIdentity(context.Set<MappedSizedDataTypesWithIdentity>().Single(e => e.AltId == 278), 278);
-                AssertNullMappedSizedDataTypesWithIdentity(context.Set<MappedSizedDataTypesWithIdentity>().Single(e => e.AltId == 279), 279);
-                AssertNullMappedSizedDataTypesWithIdentity(context.Set<MappedSizedDataTypesWithIdentity>().Single(e => e.AltId == 280), 280);
+                AssertNullMappedSizedDataTypesWithIdentity(
+                    context.Set<MappedSizedDataTypesWithIdentity>().Single(e => e.AltId == 278), 278);
+                AssertNullMappedSizedDataTypesWithIdentity(
+                    context.Set<MappedSizedDataTypesWithIdentity>().Single(e => e.AltId == 279), 279);
+                AssertNullMappedSizedDataTypesWithIdentity(
+                    context.Set<MappedSizedDataTypesWithIdentity>().Single(e => e.AltId == 280), 280);
             }
         }
 
-        [Fact]
+        [ConditionalFact]
         public virtual void Can_insert_and_read_back_all_mapped_data_types_with_scale_with_Identity_in_batch()
         {
             // Scale expected to be ignored, but everything should still work
@@ -847,7 +786,7 @@ namespace Microsoft.EntityFrameworkCore
             }
         }
 
-        [Fact]
+        [ConditionalFact]
         public virtual void Can_insert_and_read_back_all_mapped_data_types_with_precision_and_scale_with_Identity_in_batch()
         {
             // Precision and scale expected to be ignored, but everything should still work
@@ -855,23 +794,11 @@ namespace Microsoft.EntityFrameworkCore
             using (var context = CreateContext())
             {
                 context.Set<MappedPrecisionAndScaledDataTypesWithIdentity>().Add(
-                    new MappedPrecisionAndScaledDataTypesWithIdentity
-                    {
-                        AltId = 177,
-                        Decimal = 101.1m
-                    });
+                    new MappedPrecisionAndScaledDataTypesWithIdentity { AltId = 177, Decimal = 101.1m });
                 context.Set<MappedPrecisionAndScaledDataTypesWithIdentity>().Add(
-                    new MappedPrecisionAndScaledDataTypesWithIdentity
-                    {
-                        AltId = 178,
-                        Decimal = 101.1m
-                    });
+                    new MappedPrecisionAndScaledDataTypesWithIdentity { AltId = 178, Decimal = 101.1m });
                 context.Set<MappedPrecisionAndScaledDataTypesWithIdentity>().Add(
-                    new MappedPrecisionAndScaledDataTypesWithIdentity
-                    {
-                        AltId = 179,
-                        Decimal = 101.1m
-                    });
+                    new MappedPrecisionAndScaledDataTypesWithIdentity { AltId = 179, Decimal = 101.1m });
 
                 Assert.Equal(3, context.SaveChanges());
             }
@@ -889,604 +816,707 @@ namespace Microsoft.EntityFrameworkCore
             }
         }
 
-        [Fact]
+        [ConditionalFact]
         public void Can_get_column_types_from_built_model()
         {
-            using (var context = CreateContext())
+            using var context = CreateContext();
+            var typeMapper = context.GetService<IRelationalTypeMappingSource>();
+
+            foreach (var property in context.Model.GetEntityTypes().SelectMany(e => e.GetDeclaredProperties()))
             {
-                var typeMapper = context.GetService<IRelationalTypeMappingSource>();
+                var columnType = property.GetColumnType();
+                Assert.NotNull(columnType);
 
-                foreach (var property in context.Model.GetEntityTypes().SelectMany(e => e.GetDeclaredProperties()))
+                if (property[RelationalAnnotationNames.ColumnType] == null)
                 {
-                    var columnType = property.Relational().ColumnType;
-                    Assert.NotNull(columnType);
-
-                    if (property[RelationalAnnotationNames.ColumnType] == null)
-                    {
-                        Assert.Equal(
-                            columnType.ToLowerInvariant(),
-                            typeMapper.FindMapping(property).StoreType.ToLowerInvariant());
-                    }
+                    Assert.Equal(
+                        columnType.ToLowerInvariant(),
+                        typeMapper.FindMapping(property).StoreType.ToLowerInvariant());
                 }
             }
         }
 
-#if !Test21
-        [Fact]
-        public virtual void Can_query_Min_of_converted_types()
+        [ConditionalFact]
+        public virtual void Cant_query_Min_of_converted_types()
         {
-            using (var context = CreateContext())
+            using var context = CreateContext();
+            var min = new BuiltInNullableDataTypes
             {
-                var min = new BuiltInNullableDataTypes
-                {
-                    Id = 201,
-                    PartitionId = 200,
-                    TestNullableDecimal = 2,
-                    TestNullableDateTime = new DateTime(2018, 2, 2, 0, 0, 0),
-                    TestNullableDateTimeOffset = new DateTimeOffset(2018, 1, 1, 12, 0, 0, TimeSpan.Zero),
-                    TestNullableTimeSpan = TimeSpan.FromDays(2),
-                    TestNullableUnsignedInt64 = 0,
-                    TestNullableCharacter = 'A'
-                };
-                context.Add(min);
+                Id = 201,
+                PartitionId = 200,
+                TestNullableDecimal = 2.000000000000001m,
+                TestNullableDateTimeOffset = new DateTimeOffset(2018, 1, 1, 12, 0, 0, TimeSpan.Zero),
+                TestNullableTimeSpan = TimeSpan.FromDays(2),
+                TestNullableUnsignedInt64 = 0
+            };
+            context.Add(min);
 
-                var max = new BuiltInNullableDataTypes
-                {
-                    Id = 202,
-                    PartitionId = 200,
+            var max = new BuiltInNullableDataTypes
+            {
+                Id = 202,
+                PartitionId = 200,
+                TestNullableDecimal = 10.000000000000001m,
+                TestNullableDateTimeOffset = new DateTimeOffset(2018, 1, 1, 11, 0, 0, TimeSpan.FromHours(-2)),
+                TestNullableTimeSpan = TimeSpan.FromDays(10),
+                TestNullableUnsignedInt64 = long.MaxValue + 1ul
+            };
+            context.Add(max);
 
-                    TestNullableDecimal = 10,
-                    TestNullableDateTime = new DateTime(2018, 10, 10, 0, 0, 0),
-                    TestNullableDateTimeOffset = new DateTimeOffset(2018, 1, 1, 11, 0, 0, TimeSpan.FromHours(-2)),
-                    TestNullableTimeSpan = TimeSpan.FromDays(10),
-                    TestNullableUnsignedInt64 = ulong.MaxValue,
-                    TestNullableCharacter = 'B'
-                };
-                context.Add(max);
+            context.SaveChanges();
 
-                context.SaveChanges();
+            var query = context.Set<BuiltInNullableDataTypes>()
+                .Where(e => e.PartitionId == 200)
+                .GroupBy(_ => true);
 
-                var result = context.Set<BuiltInNullableDataTypes>()
-                    .Where(e => e.PartitionId == 200)
-                    .GroupBy(_ => true)
-                    .Select(
-                        g => new BuiltInNullableDataTypes
-                        {
-                            TestNullableDecimal = g.Min(e => e.TestNullableDecimal),
-                            TestNullableDateTime = g.Min(e => e.TestNullableDateTime),
-                            TestNullableDateTimeOffset = g.Min(e => e.TestNullableDateTimeOffset),
-                            TestNullableTimeSpan = g.Min(e => e.TestNullableTimeSpan),
-                            TestNullableUnsignedInt64 = g.Min(e => e.TestNullableUnsignedInt64),
-                            TestNullableCharacter = g.Min(e => e.TestNullableCharacter)
-                        })
-                    .ToList()[0];
+            var ex = Assert.Throws<InvalidOperationException>(
+                () => query
+                    .Select(g => g.Min(e => e.TestNullableDecimal))
+                    .ToList());
 
-                Assert.Equal(min.TestNullableDecimal, result.TestNullableDecimal);
-                Assert.Equal(min.TestNullableDateTime, result.TestNullableDateTime);
-                Assert.Equal(min.TestNullableDateTimeOffset, result.TestNullableDateTimeOffset);
-                Assert.Equal(min.TestNullableTimeSpan, result.TestNullableTimeSpan);
-                Assert.Equal(min.TestNullableUnsignedInt64, result.TestNullableUnsignedInt64);
-                Assert.Equal(min.TestNullableCharacter, result.TestNullableCharacter);
-            }
+            AssertTranslationFailed(
+                () => query
+                    .Select(g => g.Min(e => e.TestNullableDecimal))
+                    .ToList());
+
+            AssertTranslationFailed(
+                () => query
+                    .Select(g => g.Min(e => e.TestNullableDateTimeOffset))
+                    .ToList());
+
+            AssertTranslationFailed(
+                () => query
+                    .Select(g => g.Min(e => e.TestNullableTimeSpan))
+                    .ToList());
+
+            AssertTranslationFailed(
+                () => query
+                    .Select(g => g.Min(e => e.TestNullableUnsignedInt64))
+                    .ToList());
         }
 
-        [Fact]
-        public virtual void Can_query_Max_of_converted_types()
+        [ConditionalFact]
+        public virtual void Cant_query_Max_of_converted_types()
         {
-            using (var context = CreateContext())
+            using var context = CreateContext();
+            var min = new BuiltInNullableDataTypes
             {
-                var min = new BuiltInNullableDataTypes
-                {
-                    Id = 203,
-                    PartitionId = 201,
-                    TestNullableDecimal = 2,
-                    TestNullableDateTime = new DateTime(2018, 2, 2, 0, 0, 0),
-                    TestNullableDateTimeOffset = new DateTimeOffset(2018, 1, 1, 12, 0, 0, TimeSpan.Zero),
-                    TestNullableTimeSpan = TimeSpan.FromDays(2),
-                    TestNullableUnsignedInt64 = 0,
-                    TestNullableCharacter = 'A'
-                };
-                context.Add(min);
+                Id = 203,
+                PartitionId = 201,
+                TestNullableDecimal = 2.000000000000001m,
+                TestNullableDateTimeOffset = new DateTimeOffset(2018, 1, 1, 12, 0, 0, TimeSpan.Zero),
+                TestNullableTimeSpan = TimeSpan.FromDays(2),
+                TestNullableUnsignedInt64 = 0
+            };
+            context.Add(min);
 
-                var max = new BuiltInNullableDataTypes
-                {
-                    Id = 204,
-                    PartitionId = 201,
-                    TestNullableDecimal = 10,
-                    TestNullableDateTime = new DateTime(2018, 10, 10, 0, 0, 0),
-                    TestNullableDateTimeOffset = new DateTimeOffset(2018, 1, 1, 11, 0, 0, TimeSpan.FromHours(-2)),
-                    TestNullableTimeSpan = TimeSpan.FromDays(10),
-                    TestNullableUnsignedInt64 = ulong.MaxValue,
-                    TestNullableCharacter = 'B'
-                };
-                context.Add(max);
+            var max = new BuiltInNullableDataTypes
+            {
+                Id = 204,
+                PartitionId = 201,
+                TestNullableDecimal = 10.000000000000001m,
+                TestNullableDateTimeOffset = new DateTimeOffset(2018, 1, 1, 11, 0, 0, TimeSpan.FromHours(-2)),
+                TestNullableTimeSpan = TimeSpan.FromDays(10),
+                TestNullableUnsignedInt64 = long.MaxValue + 1ul
+            };
+            context.Add(max);
 
-                context.SaveChanges();
+            context.SaveChanges();
 
-                var result = context.Set<BuiltInNullableDataTypes>()
-                    .Where(e => e.PartitionId == 201)
-                    .GroupBy(_ => true)
-                    .Select(
-                        g => new BuiltInNullableDataTypes
-                        {
-                            TestNullableDecimal = g.Max(e => e.TestNullableDecimal),
-                            TestNullableDateTime = g.Max(e => e.TestNullableDateTime),
-                            TestNullableDateTimeOffset = g.Max(e => e.TestNullableDateTimeOffset),
-                            TestNullableTimeSpan = g.Max(e => e.TestNullableTimeSpan),
-                            TestNullableUnsignedInt64 = g.Max(e => e.TestNullableUnsignedInt64),
-                            TestNullableCharacter = g.Max(e => e.TestNullableCharacter)
-                        })
-                    .ToList()[0];
+            var query = context.Set<BuiltInNullableDataTypes>()
+                .Where(e => e.PartitionId == 201)
+                .GroupBy(_ => true);
 
-                Assert.Equal(max.TestNullableDecimal, result.TestNullableDecimal);
-                Assert.Equal(max.TestNullableDateTime, result.TestNullableDateTime);
-                Assert.Equal(max.TestNullableDateTimeOffset, result.TestNullableDateTimeOffset);
-                Assert.Equal(max.TestNullableTimeSpan, result.TestNullableTimeSpan);
-                Assert.Equal(max.TestNullableUnsignedInt64, result.TestNullableUnsignedInt64);
-                Assert.Equal(max.TestNullableCharacter, result.TestNullableCharacter);
-            }
+            AssertTranslationFailed(
+                () => query
+                    .Select(g => g.Max(e => e.TestNullableDecimal))
+                    .ToList());
+
+            AssertTranslationFailed(
+                () => query
+                    .Select(g => g.Max(e => e.TestNullableDateTimeOffset))
+                    .ToList());
+
+            AssertTranslationFailed(
+                () => query
+                    .Select(g => g.Max(e => e.TestNullableTimeSpan))
+                    .ToList());
+
+            AssertTranslationFailed(
+                () => query
+                    .Select(g => g.Max(e => e.TestNullableUnsignedInt64))
+                    .ToList());
         }
 
-        [Fact]
-        public virtual void Can_query_Average_of_converted_types()
+        [ConditionalFact]
+        public virtual void Cant_query_Average_of_converted_types()
         {
-            using (var context = CreateContext())
-            {
-                context.Add(
-                    new BuiltInNullableDataTypes
-                    {
-                        Id = 205,
-                        PartitionId = 202,
-                        TestNullableDecimal = 1.000000000000001m
-                    });
+            using var context = CreateContext();
+            context.Add(
+                new BuiltInNullableDataTypes
+                {
+                    Id = 205,
+                    PartitionId = 202,
+                    TestNullableDecimal = 1.000000000000003m
+                });
 
-                context.Add(
-                    new BuiltInNullableDataTypes
-                    {
-                        Id = 206,
-                        PartitionId = 202,
-                        TestNullableDecimal = 1.000000000000001m
-                    });
+            context.Add(
+                new BuiltInNullableDataTypes
+                {
+                    Id = 206,
+                    PartitionId = 202,
+                    TestNullableDecimal = 1.000000000000001m
+                });
 
-                context.SaveChanges();
+            context.SaveChanges();
 
-                var result = context.Set<BuiltInNullableDataTypes>()
+            AssertTranslationFailed(
+                () => context.Set<BuiltInNullableDataTypes>()
                     .Where(e => e.PartitionId == 202)
-                    .Average(e => e.TestNullableDecimal);
-
-                Assert.Equal(1.000000000000001m, result);
-            }
+                    .Average(e => e.TestNullableDecimal));
         }
 
-        [Fact]
-        public virtual void Can_query_Sum_of_converted_types()
+        [ConditionalFact]
+        public virtual void Cant_query_Sum_of_converted_types()
         {
-            using (var context = CreateContext())
-            {
-                context.Add(
-                    new BuiltInDataTypes
-                    {
-                        Id = 205,
-                        PartitionId = 203,
-                        TestDecimal = 1.000000000000001m
-                    });
+            using var context = CreateContext();
+            context.Add(
+                new BuiltInDataTypes
+                {
+                    Id = 205,
+                    PartitionId = 203,
+                    TestDecimal = 1.000000000000001m
+                });
 
-                context.Add(
-                    new BuiltInDataTypes
-                    {
-                        Id = 206,
-                        PartitionId = 203,
-                        TestDecimal = 1.000000000000001m
-                    });
+            context.Add(
+                new BuiltInDataTypes
+                {
+                    Id = 206,
+                    PartitionId = 203,
+                    TestDecimal = 1.000000000000001m
+                });
 
-                context.SaveChanges();
+            context.SaveChanges();
 
-                var result = context.Set<BuiltInDataTypes>()
+            AssertTranslationFailed(
+                () => context.Set<BuiltInDataTypes>()
                     .Where(e => e.PartitionId == 203)
-                    .Sum(e => e.TestDecimal);
-
-                Assert.Equal(2.000000000000002m, result);
-            }
+                    .Sum(e => e.TestDecimal));
         }
 
-        [Fact]
+        [ConditionalFact]
         public virtual void Can_query_negation_of_converted_types()
         {
-            using (var context = CreateContext())
-            {
-                context.Add(
-                    new BuiltInDataTypes
+            using var context = CreateContext();
+            context.Add(
+                new BuiltInDataTypes
+                {
+                    Id = 207,
+                    PartitionId = 204,
+                    TestDecimal = 1.000000000000001m,
+                    TestTimeSpan = TimeSpan.FromMinutes(1)
+                });
+
+            context.SaveChanges();
+
+            var result = context.Set<BuiltInDataTypes>()
+                .Select(
+                    e => new BuiltInDataTypes
                     {
-                        Id = 207,
-                        PartitionId = 204,
-                        TestDecimal = 1.000000000000001m,
-                        TestTimeSpan = TimeSpan.FromMinutes(1)
-                    });
+                        Id = e.Id,
+                        TestDecimal = -e.TestDecimal,
+                        TestTimeSpan = -e.TestTimeSpan
+                    })
+                .First(e => e.Id == 207);
 
-                context.SaveChanges();
-
-                var result = context.Set<BuiltInDataTypes>()
-                    .Select(
-                        e => new BuiltInDataTypes
-                        {
-                            Id = e.Id,
-                            TestDecimal = -e.TestDecimal,
-                            TestTimeSpan = -e.TestTimeSpan
-                        })
-                    .First(e => e.Id == 207);
-
-                Assert.Equal(-1.000000000000001m, result.TestDecimal);
-                Assert.Equal(TimeSpan.FromMinutes(-1), result.TestTimeSpan);
-            }
+            Assert.Equal(-1.000000000000001m, result.TestDecimal);
+            Assert.Equal(TimeSpan.FromMinutes(-1), result.TestTimeSpan);
         }
 
-        [Fact]
+        [ConditionalFact]
         public virtual void Can_query_add_of_converted_types()
         {
-            using (var context = CreateContext())
-            {
-                context.Add(
-                    new BuiltInDataTypes
+            using var context = CreateContext();
+            context.Add(
+                new BuiltInDataTypes
+                {
+                    Id = 208,
+                    PartitionId = 204,
+                    TestDecimal = 1.000000000000001m,
+                    TestDateTime = new DateTime(2018, 1, 1, 0, 0, 0),
+                    TestDateTimeOffset = new DateTimeOffset(2018, 1, 1, 0, 0, 0, TimeSpan.Zero),
+                    TestTimeSpan = TimeSpan.FromMinutes(1),
+                    TestUnsignedInt64 = ulong.MaxValue - 1ul
+                });
+
+            context.SaveChanges();
+
+            var result = context.Set<BuiltInDataTypes>()
+                .Select(
+                    e => new BuiltInDataTypes
                     {
-                        Id = 208,
-                        PartitionId = 204,
-                        TestDecimal = 1.000000000000001m,
-                        TestDateTime = new DateTime(2018, 1, 1, 0, 0, 0),
-                        TestDateTimeOffset = new DateTimeOffset(2018, 1, 1, 0, 0, 0, TimeSpan.Zero),
-                        TestTimeSpan = TimeSpan.FromMinutes(1),
-                        TestUnsignedInt64 = ulong.MaxValue - 1ul
-                    });
+                        Id = e.Id,
+                        TestDecimal = e.TestDecimal + 1m,
+                        TestDateTime = e.TestDateTime + new TimeSpan(0, 1, 0),
+                        TestDateTimeOffset = e.TestDateTimeOffset + new TimeSpan(0, 1, 0),
+                        TestTimeSpan = e.TestTimeSpan + new TimeSpan(0, 1, 0),
+                        TestUnsignedInt64 = e.TestUnsignedInt64 + 1ul
+                    })
+                .First(e => e.Id == 208);
 
-                context.SaveChanges();
-
-                var result = context.Set<BuiltInDataTypes>()
-                    .Select(
-                        e => new BuiltInDataTypes
-                        {
-                            Id = e.Id,
-                            TestDecimal = e.TestDecimal + 1m,
-                            TestDateTime = e.TestDateTime + new TimeSpan(0, 1, 0),
-                            TestDateTimeOffset = e.TestDateTimeOffset + new TimeSpan(0, 1, 0),
-                            TestTimeSpan = e.TestTimeSpan + new TimeSpan(0, 1, 0),
-                            TestUnsignedInt64 = e.TestUnsignedInt64 + 1ul
-                        })
-                    .First(e => e.Id == 208);
-
-                Assert.Equal(2.000000000000001m, result.TestDecimal);
-                Assert.Equal(new DateTime(2018, 1, 1, 0, 1, 0), result.TestDateTime);
-                Assert.Equal(new DateTimeOffset(2018, 1, 1, 0, 1, 0, TimeSpan.Zero), result.TestDateTimeOffset);
-                Assert.Equal(TimeSpan.FromMinutes(2), result.TestTimeSpan);
-                Assert.Equal(ulong.MaxValue, result.TestUnsignedInt64);
-            }
+            Assert.Equal(2.000000000000001m, result.TestDecimal);
+            Assert.Equal(new DateTime(2018, 1, 1, 0, 1, 0), result.TestDateTime);
+            Assert.Equal(new DateTimeOffset(2018, 1, 1, 0, 1, 0, TimeSpan.Zero), result.TestDateTimeOffset);
+            Assert.Equal(TimeSpan.FromMinutes(2), result.TestTimeSpan);
+            Assert.Equal(ulong.MaxValue, result.TestUnsignedInt64);
         }
 
-        [Fact]
+        [ConditionalFact]
         public virtual void Can_query_subtract_of_converted_types()
         {
-            using (var context = CreateContext())
-            {
-                context.Add(
-                    new BuiltInDataTypes
+            using var context = CreateContext();
+            context.Add(
+                new BuiltInDataTypes
+                {
+                    Id = 209,
+                    PartitionId = 204,
+                    TestDecimal = 2.000000000000001m,
+                    TestDateTime = new DateTime(2018, 1, 1, 0, 1, 0),
+                    TestDateTimeOffset = new DateTimeOffset(2018, 1, 1, 0, 1, 0, TimeSpan.Zero),
+                    TestTimeSpan = TimeSpan.FromMinutes(2),
+                    TestUnsignedInt64 = ulong.MaxValue
+                });
+
+            context.SaveChanges();
+
+            var result = context.Set<BuiltInDataTypes>()
+                .Select(
+                    e => new
                     {
-                        Id = 209,
-                        PartitionId = 204,
-                        TestDecimal = 2.000000000000001m,
-                        TestDateTime = new DateTime(2018, 1, 1, 0, 1, 0),
-                        TestDateTimeOffset = new DateTimeOffset(2018, 1, 1, 0, 1, 0, TimeSpan.Zero),
-                        TestTimeSpan = TimeSpan.FromMinutes(2),
-                        TestUnsignedInt64 = ulong.MaxValue
-                    });
+                        e.Id,
+                        TestDecimal = e.TestDecimal - 1m,
+                        TestDateTime1 = e.TestDateTime - new TimeSpan(0, 1, 0),
+                        TestDateTime2 = e.TestDateTime - new DateTime(2018, 1, 1, 0, 0, 0),
+                        TestDateTimeOffset1 = e.TestDateTimeOffset - new TimeSpan(0, 1, 0),
+                        TestDateTimeOffset2 = e.TestDateTimeOffset - new DateTimeOffset(2018, 1, 1, 0, 0, 0, TimeSpan.Zero),
+                        TestTimeSpan = e.TestTimeSpan - new TimeSpan(0, 1, 0),
+                        TestUnsignedInt64 = e.TestUnsignedInt64 - 1ul
+                    })
+                .First(e => e.Id == 209);
 
-                context.SaveChanges();
-
-                var result = context.Set<BuiltInDataTypes>()
-                    .Select(
-                        e => new
-                        {
-                            e.Id,
-                            TestDecimal = e.TestDecimal - 1m,
-                            TestDateTime1 = e.TestDateTime - new TimeSpan(0, 1, 0),
-                            TestDateTime2 = e.TestDateTime - new DateTime(2018, 1, 1, 0, 0, 0),
-                            TestDateTimeOffset1 = e.TestDateTimeOffset - new TimeSpan(0, 1, 0),
-                            TestDateTimeOffset2 = e.TestDateTimeOffset - new DateTimeOffset(2018, 1, 1, 0, 0, 0, TimeSpan.Zero),
-                            TestTimeSpan = e.TestTimeSpan - new TimeSpan(0, 1, 0),
-                            TestUnsignedInt64 = e.TestUnsignedInt64 - 1ul
-                        })
-                    .First(e => e.Id == 209);
-
-                Assert.Equal(1.000000000000001m, result.TestDecimal);
-                Assert.Equal(new DateTime(2018, 1, 1, 0, 0, 0), result.TestDateTime1);
-                Assert.Equal(TimeSpan.FromMinutes(1), result.TestDateTime2);
-                Assert.Equal(new DateTimeOffset(2018, 1, 1, 0, 0, 0, TimeSpan.Zero), result.TestDateTimeOffset1);
-                Assert.Equal(TimeSpan.FromMinutes(1), result.TestDateTimeOffset2);
-                Assert.Equal(TimeSpan.FromMinutes(1), result.TestTimeSpan);
-                Assert.Equal(ulong.MaxValue - 1ul, result.TestUnsignedInt64);
-            }
+            Assert.Equal(1.000000000000001m, result.TestDecimal);
+            Assert.Equal(new DateTime(2018, 1, 1, 0, 0, 0), result.TestDateTime1);
+            Assert.Equal(TimeSpan.FromMinutes(1), result.TestDateTime2);
+            Assert.Equal(new DateTimeOffset(2018, 1, 1, 0, 0, 0, TimeSpan.Zero), result.TestDateTimeOffset1);
+            Assert.Equal(TimeSpan.FromMinutes(1), result.TestDateTimeOffset2);
+            Assert.Equal(TimeSpan.FromMinutes(1), result.TestTimeSpan);
+            Assert.Equal(ulong.MaxValue - 1ul, result.TestUnsignedInt64);
         }
 
-        [Fact]
+        [ConditionalFact]
         public virtual void Can_query_less_than_of_converted_types()
         {
-            using (var context = CreateContext())
-            {
-                context.Add(
-                    new BuiltInDataTypes
+            using var context = CreateContext();
+            context.Add(
+                new BuiltInDataTypes
+                {
+                    Id = 210,
+                    PartitionId = 204,
+                    TestDecimal = 2,
+                    TestDateTime = new DateTime(2018, 2, 2, 0, 0, 0),
+                    TestDateTimeOffset = new DateTimeOffset(2018, 1, 1, 12, 0, 0, TimeSpan.Zero),
+                    TestTimeSpan = TimeSpan.FromDays(2),
+                    TestUnsignedInt64 = 0,
+                    TestCharacter = 'A'
+                });
+
+            context.SaveChanges();
+
+            var result = context.Set<BuiltInDataTypes>()
+                .Select(
+                    e => new
                     {
-                        Id = 210,
-                        PartitionId = 204,
-                        TestDecimal = 2,
-                        TestDateTime = new DateTime(2018, 2, 2, 0, 0, 0),
-                        TestDateTimeOffset = new DateTimeOffset(2018, 1, 1, 12, 0, 0, TimeSpan.Zero),
-                        TestTimeSpan = TimeSpan.FromDays(2),
-                        TestUnsignedInt64 = 0,
-                        TestCharacter = 'A'
-                    });
+                        e.Id,
+                        TestDecimal = e.TestDecimal < 10m,
+                        TestDateTime = e.TestDateTime < new DateTime(2018, 10, 10, 0, 0, 0),
+                        TestDateTimeOffset =
+                            e.TestDateTimeOffset < new DateTimeOffset(2018, 1, 1, 11, 0, 0, TimeSpan.FromHours(-2)),
+                        TestTimeSpan = e.TestTimeSpan < new TimeSpan(10, 0, 0, 0),
+                        TestUnsignedInt64 = e.TestUnsignedInt64 < ulong.MaxValue,
+                        TestCharacter = e.TestCharacter < 'B'
+                    })
+                .First(e => e.Id == 210);
 
-                context.SaveChanges();
-
-                var result = context.Set<BuiltInDataTypes>()
-                    .Select(
-                        e => new
-                        {
-                            e.Id,
-                            TestDecimal = e.TestDecimal < 10m,
-                            TestDateTime = e.TestDateTime < new DateTime(2018, 10, 10, 0, 0, 0),
-                            TestDateTimeOffset = e.TestDateTimeOffset < new DateTimeOffset(2018, 1, 1, 11, 0, 0, TimeSpan.FromHours(-2)),
-                            TestTimeSpan = e.TestTimeSpan < new TimeSpan(10, 0, 0, 0),
-                            TestUnsignedInt64 = e.TestUnsignedInt64 < ulong.MaxValue,
-                            TestCharacter = e.TestCharacter < 'B'
-                        })
-                    .First(e => e.Id == 210);
-
-                Assert.True(result.TestDecimal);
-                Assert.True(result.TestDateTime);
-                Assert.True(result.TestDateTimeOffset);
-                Assert.True(result.TestTimeSpan);
-                Assert.True(result.TestUnsignedInt64);
-                Assert.True(result.TestCharacter);
-            }
+            Assert.True(result.TestDecimal);
+            Assert.True(result.TestDateTime);
+            Assert.True(result.TestDateTimeOffset);
+            Assert.True(result.TestTimeSpan);
+            Assert.True(result.TestUnsignedInt64);
+            Assert.True(result.TestCharacter);
         }
 
-        [Fact]
+        [ConditionalFact]
         public virtual void Can_query_less_than_or_equal_of_converted_types()
         {
-            using (var context = CreateContext())
-            {
-                context.Add(
-                    new BuiltInDataTypes
+            using var context = CreateContext();
+            context.Add(
+                new BuiltInDataTypes
+                {
+                    Id = 211,
+                    PartitionId = 204,
+                    TestDecimal = 2,
+                    TestDateTime = new DateTime(2018, 2, 2, 0, 0, 0),
+                    TestDateTimeOffset = new DateTimeOffset(2018, 1, 1, 12, 0, 0, TimeSpan.Zero),
+                    TestTimeSpan = TimeSpan.FromDays(2),
+                    TestUnsignedInt64 = 0,
+                    TestCharacter = 'A'
+                });
+
+            context.SaveChanges();
+
+            var result = context.Set<BuiltInDataTypes>()
+                .Select(
+                    e => new
                     {
-                        Id = 211,
-                        PartitionId = 204,
-                        TestDecimal = 2,
-                        TestDateTime = new DateTime(2018, 2, 2, 0, 0, 0),
-                        TestDateTimeOffset = new DateTimeOffset(2018, 1, 1, 12, 0, 0, TimeSpan.Zero),
-                        TestTimeSpan = TimeSpan.FromDays(2),
-                        TestUnsignedInt64 = 0,
-                        TestCharacter = 'A'
-                    });
+                        e.Id,
+                        TestDecimal = e.TestDecimal <= 10m,
+                        TestDateTime = e.TestDateTime <= new DateTime(2018, 10, 10, 0, 0, 0),
+                        TestDateTimeOffset =
+                            e.TestDateTimeOffset <= new DateTimeOffset(2018, 1, 1, 11, 0, 0, TimeSpan.FromHours(-2)),
+                        TestTimeSpan = e.TestTimeSpan <= new TimeSpan(10, 0, 0, 0),
+                        TestUnsignedInt64 = e.TestUnsignedInt64 <= ulong.MaxValue,
+                        TestCharacter = e.TestCharacter <= 'B'
+                    })
+                .First(e => e.Id == 211);
 
-                context.SaveChanges();
-
-                var result = context.Set<BuiltInDataTypes>()
-                    .Select(
-                        e => new
-                        {
-                            e.Id,
-                            TestDecimal = e.TestDecimal <= 10m,
-                            TestDateTime = e.TestDateTime <= new DateTime(2018, 10, 10, 0, 0, 0),
-                            TestDateTimeOffset = e.TestDateTimeOffset <= new DateTimeOffset(2018, 1, 1, 11, 0, 0, TimeSpan.FromHours(-2)),
-                            TestTimeSpan = e.TestTimeSpan <= new TimeSpan(10, 0, 0, 0),
-                            TestUnsignedInt64 = e.TestUnsignedInt64 <= ulong.MaxValue,
-                            TestCharacter = e.TestCharacter <= 'B'
-                        })
-                    .First(e => e.Id == 211);
-
-                Assert.True(result.TestDecimal);
-                Assert.True(result.TestDateTime);
-                Assert.True(result.TestDateTimeOffset);
-                Assert.True(result.TestTimeSpan);
-                Assert.True(result.TestUnsignedInt64);
-                Assert.True(result.TestCharacter);
-            }
+            Assert.True(result.TestDecimal);
+            Assert.True(result.TestDateTime);
+            Assert.True(result.TestDateTimeOffset);
+            Assert.True(result.TestTimeSpan);
+            Assert.True(result.TestUnsignedInt64);
+            Assert.True(result.TestCharacter);
         }
 
-        [Fact]
+        [ConditionalFact]
         public virtual void Can_query_greater_than_of_converted_types()
         {
-            using (var context = CreateContext())
-            {
-                context.Add(
-                    new BuiltInDataTypes
+            using var context = CreateContext();
+            context.Add(
+                new BuiltInDataTypes
+                {
+                    Id = 212,
+                    PartitionId = 204,
+                    TestDecimal = 2,
+                    TestDateTime = new DateTime(2018, 2, 2, 0, 0, 0),
+                    TestDateTimeOffset = new DateTimeOffset(2018, 1, 1, 12, 0, 0, TimeSpan.Zero),
+                    TestTimeSpan = TimeSpan.FromDays(2),
+                    TestUnsignedInt64 = 0,
+                    TestCharacter = 'A'
+                });
+
+            context.SaveChanges();
+
+            var result = context.Set<BuiltInDataTypes>()
+                .Select(
+                    e => new
                     {
-                        Id = 212,
-                        PartitionId = 204,
-                        TestDecimal = 2,
-                        TestDateTime = new DateTime(2018, 2, 2, 0, 0, 0),
-                        TestDateTimeOffset = new DateTimeOffset(2018, 1, 1, 12, 0, 0, TimeSpan.Zero),
-                        TestTimeSpan = TimeSpan.FromDays(2),
-                        TestUnsignedInt64 = 0,
-                        TestCharacter = 'A'
-                    });
+                        e.Id,
+                        TestDecimal = e.TestDecimal > 10m,
+                        TestDateTime = e.TestDateTime > new DateTime(2018, 10, 10, 0, 0, 0),
+                        TestDateTimeOffset =
+                            e.TestDateTimeOffset > new DateTimeOffset(2018, 1, 1, 11, 0, 0, TimeSpan.FromHours(-2)),
+                        TestTimeSpan = e.TestTimeSpan > new TimeSpan(10, 0, 0, 0),
+                        TestUnsignedInt64 = e.TestUnsignedInt64 > ulong.MaxValue,
+                        TestCharacter = e.TestCharacter > 'B'
+                    })
+                .First(e => e.Id == 212);
 
-                context.SaveChanges();
-
-                var result = context.Set<BuiltInDataTypes>()
-                    .Select(
-                        e => new
-                        {
-                            e.Id,
-                            TestDecimal = e.TestDecimal > 10m,
-                            TestDateTime = e.TestDateTime > new DateTime(2018, 10, 10, 0, 0, 0),
-                            TestDateTimeOffset = e.TestDateTimeOffset > new DateTimeOffset(2018, 1, 1, 11, 0, 0, TimeSpan.FromHours(-2)),
-                            TestTimeSpan = e.TestTimeSpan > new TimeSpan(10, 0, 0, 0),
-                            TestUnsignedInt64 = e.TestUnsignedInt64 > ulong.MaxValue,
-                            TestCharacter = e.TestCharacter > 'B'
-                        })
-                    .First(e => e.Id == 212);
-
-                Assert.False(result.TestDecimal);
-                Assert.False(result.TestDateTime);
-                Assert.False(result.TestDateTimeOffset);
-                Assert.False(result.TestTimeSpan);
-                Assert.False(result.TestUnsignedInt64);
-                Assert.False(result.TestCharacter);
-            }
+            Assert.False(result.TestDecimal);
+            Assert.False(result.TestDateTime);
+            Assert.False(result.TestDateTimeOffset);
+            Assert.False(result.TestTimeSpan);
+            Assert.False(result.TestUnsignedInt64);
+            Assert.False(result.TestCharacter);
         }
 
-        [Fact]
+        [ConditionalFact]
         public virtual void Can_query_greater_than_or_equal_of_converted_types()
         {
-            using (var context = CreateContext())
-            {
-                context.Add(
-                    new BuiltInDataTypes
+            using var context = CreateContext();
+            context.Add(
+                new BuiltInDataTypes
+                {
+                    Id = 213,
+                    PartitionId = 204,
+                    TestDecimal = 2,
+                    TestDateTime = new DateTime(2018, 2, 2, 0, 0, 0),
+                    TestDateTimeOffset = new DateTimeOffset(2018, 1, 1, 12, 0, 0, TimeSpan.Zero),
+                    TestTimeSpan = TimeSpan.FromDays(2),
+                    TestUnsignedInt64 = 0,
+                    TestCharacter = 'A'
+                });
+
+            context.SaveChanges();
+
+            var result = context.Set<BuiltInDataTypes>()
+                .Select(
+                    e => new
                     {
-                        Id = 213,
-                        PartitionId = 204,
-                        TestDecimal = 2,
-                        TestDateTime = new DateTime(2018, 2, 2, 0, 0, 0),
-                        TestDateTimeOffset = new DateTimeOffset(2018, 1, 1, 12, 0, 0, TimeSpan.Zero),
-                        TestTimeSpan = TimeSpan.FromDays(2),
-                        TestUnsignedInt64 = 0,
-                        TestCharacter = 'A'
-                    });
+                        e.Id,
+                        TestDecimal = e.TestDecimal >= 10m,
+                        TestDateTime = e.TestDateTime >= new DateTime(2018, 10, 10, 0, 0, 0),
+                        TestDateTimeOffset =
+                            e.TestDateTimeOffset >= new DateTimeOffset(2018, 1, 1, 11, 0, 0, TimeSpan.FromHours(-2)),
+                        TestTimeSpan = e.TestTimeSpan >= new TimeSpan(10, 0, 0, 0),
+                        TestUnsignedInt64 = e.TestUnsignedInt64 >= ulong.MaxValue,
+                        TestCharacter = e.TestCharacter >= 'B'
+                    })
+                .First(e => e.Id == 213);
 
-                context.SaveChanges();
-
-                var result = context.Set<BuiltInDataTypes>()
-                    .Select(
-                        e => new
-                        {
-                            e.Id,
-                            TestDecimal = e.TestDecimal >= 10m,
-                            TestDateTime = e.TestDateTime >= new DateTime(2018, 10, 10, 0, 0, 0),
-                            TestDateTimeOffset = e.TestDateTimeOffset >= new DateTimeOffset(2018, 1, 1, 11, 0, 0, TimeSpan.FromHours(-2)),
-                            TestTimeSpan = e.TestTimeSpan >= new TimeSpan(10, 0, 0, 0),
-                            TestUnsignedInt64 = e.TestUnsignedInt64 >= ulong.MaxValue,
-                            TestCharacter = e.TestCharacter >= 'B'
-                        })
-                    .First(e => e.Id == 213);
-
-                Assert.False(result.TestDecimal);
-                Assert.False(result.TestDateTime);
-                Assert.False(result.TestDateTimeOffset);
-                Assert.False(result.TestTimeSpan);
-                Assert.False(result.TestUnsignedInt64);
-                Assert.False(result.TestCharacter);
-            }
+            Assert.False(result.TestDecimal);
+            Assert.False(result.TestDateTime);
+            Assert.False(result.TestDateTimeOffset);
+            Assert.False(result.TestTimeSpan);
+            Assert.False(result.TestUnsignedInt64);
+            Assert.False(result.TestCharacter);
         }
 
-        [Fact]
+        [ConditionalFact]
         public virtual void Can_query_divide_of_converted_types()
         {
-            using (var context = CreateContext())
-            {
-                context.Add(
-                    new BuiltInDataTypes
+            using var context = CreateContext();
+            context.Add(
+                new BuiltInDataTypes
+                {
+                    Id = 214,
+                    PartitionId = 204,
+                    TestDecimal = 2.000000000000002m,
+                    TestTimeSpan = TimeSpan.FromMinutes(2),
+                    TestUnsignedInt64 = ulong.MaxValue
+                });
+
+            context.SaveChanges();
+
+            var result = context.Set<BuiltInDataTypes>()
+                .Select(
+                    e => new
                     {
-                        Id = 214,
-                        PartitionId = 204,
-                        TestDecimal = 2.000000000000002m,
-                        TestTimeSpan = TimeSpan.FromMinutes(2),
-                        TestUnsignedInt64 = ulong.MaxValue
-                    });
+                        e.Id,
+                        TestDecimal = e.TestDecimal / 2m,
+                        TestTimeSpan1 = e.TestTimeSpan / 2.0,
+                        TestTimeSpan2 = e.TestTimeSpan / new TimeSpan(0, 2, 0),
+                        TestUnsignedInt64 = e.TestUnsignedInt64 / 5ul
+                    })
+                .First(e => e.Id == 214);
 
-                context.SaveChanges();
-
-                var result = context.Set<BuiltInDataTypes>()
-                    .Select(
-                        e => new
-                        {
-                            e.Id,
-                            TestDecimal = e.TestDecimal / 2m,
-#if !NET461
-                            TestTimeSpan1 = e.TestTimeSpan / 2.0,
-                            TestTimeSpan2 = e.TestTimeSpan / new TimeSpan(0, 2, 0),
-#endif
-                            TestUnsignedInt64 = e.TestUnsignedInt64 / 5ul
-                        })
-                    .First(e => e.Id == 214);
-
-                Assert.Equal(1.000000000000001m, result.TestDecimal);
-#if !NET461
-                Assert.Equal(TimeSpan.FromMinutes(1), result.TestTimeSpan1);
-                Assert.Equal(1.0, result.TestTimeSpan2);
-#endif
-                Assert.Equal(ulong.MaxValue / 5, result.TestUnsignedInt64);
-            }
+            Assert.Equal(1.000000000000001m, result.TestDecimal);
+            Assert.Equal(TimeSpan.FromMinutes(1), result.TestTimeSpan1);
+            Assert.Equal(1.0, result.TestTimeSpan2);
+            Assert.Equal(ulong.MaxValue / 5, result.TestUnsignedInt64);
         }
 
-        [Fact]
+        [ConditionalFact]
         public virtual void Can_query_multiply_of_converted_types()
         {
-            using (var context = CreateContext())
-            {
-                context.Add(
-                    new BuiltInDataTypes
+            using var context = CreateContext();
+            context.Add(
+                new BuiltInDataTypes
+                {
+                    Id = 215,
+                    PartitionId = 204,
+                    TestDecimal = 1.000000000000001m,
+                    TestTimeSpan = TimeSpan.FromMinutes(1),
+                    TestUnsignedInt64 = ulong.MaxValue / 5
+                });
+
+            context.SaveChanges();
+
+            var result = context.Set<BuiltInDataTypes>()
+                .Select(
+                    e => new
                     {
-                        Id = 215,
-                        PartitionId = 204,
-                        TestDecimal = 1.000000000000001m,
-                        TestTimeSpan = TimeSpan.FromMinutes(1),
-                        TestUnsignedInt64 = ulong.MaxValue / 5
-                    });
+                        e.Id,
+                        TestDecimal = e.TestDecimal * 2m,
+                        TestTimeSpan1 = e.TestTimeSpan * 2.0,
+                        TestTimeSpan2 = 2.0 * e.TestTimeSpan,
+                        TestUnsignedInt64 = e.TestUnsignedInt64 * 5ul
+                    })
+                .First(e => e.Id == 215);
 
-                context.SaveChanges();
-
-                var result = context.Set<BuiltInDataTypes>()
-                    .Select(
-                        e => new
-                        {
-                            e.Id,
-                            TestDecimal = e.TestDecimal * 2m,
-#if !NET461
-                            TestTimeSpan1 = e.TestTimeSpan * 2.0,
-                            TestTimeSpan2 = 2.0 * e.TestTimeSpan,
-#endif
-                            TestUnsignedInt64 = e.TestUnsignedInt64 * 5ul
-                        })
-                    .First(e => e.Id == 215);
-
-                Assert.Equal(2.000000000000002m, result.TestDecimal);
-#if !NET461
-                Assert.Equal(TimeSpan.FromMinutes(2), result.TestTimeSpan1);
-                Assert.Equal(TimeSpan.FromMinutes(2), result.TestTimeSpan2);
-#endif
-                Assert.Equal(ulong.MaxValue, result.TestUnsignedInt64);
-            }
+            Assert.Equal(2.000000000000002m, result.TestDecimal);
+            Assert.Equal(TimeSpan.FromMinutes(2), result.TestTimeSpan1);
+            Assert.Equal(TimeSpan.FromMinutes(2), result.TestTimeSpan2);
+            Assert.Equal(ulong.MaxValue, result.TestUnsignedInt64);
         }
 
-        [Fact]
+        [ConditionalFact]
         public virtual void Can_query_modulo_of_converted_types()
         {
-            using (var context = CreateContext())
-            {
-                context.Add(
-                    new BuiltInDataTypes
+            using var context = CreateContext();
+            context.Add(
+                new BuiltInDataTypes
+                {
+                    Id = 216,
+                    PartitionId = 204,
+                    TestDecimal = 3.000000000000003m,
+                    TestDouble = 1.5,
+                    TestSingle = 1.5f,
+                    TestUnsignedInt64 = 10000000000000000001
+                });
+
+            context.SaveChanges();
+
+            var result = context.Set<BuiltInDataTypes>()
+                .Select(
+                    e => new BuiltInDataTypes
                     {
-                        Id = 216,
-                        PartitionId = 204,
-                        TestDecimal = 3.000000000000003m,
-                        TestUnsignedInt64 = 10000000000000000001
-                    });
+                        Id = e.Id,
+                        TestDecimal = e.TestDecimal % 2.000000000000002m,
+                        TestDouble = e.TestDouble % 1.0,
+                        TestSingle = e.TestSingle % 1.0f,
+                        TestUnsignedInt64 = e.TestUnsignedInt64 % 10000000000000000000
+                    })
+                .First(e => e.Id == 216);
 
-                context.SaveChanges();
-
-                var result = context.Set<BuiltInDataTypes>()
-                    .Select(
-                        e => new BuiltInDataTypes
-                        {
-                            Id = e.Id,
-                            TestDecimal = e.TestDecimal % 2.000000000000002m,
-                            TestUnsignedInt64 = e.TestUnsignedInt64 % 10000000000000000000
-                        })
-                    .First(e => e.Id == 216);
-
-                Assert.Equal(1.000000000000001m, result.TestDecimal);
-                Assert.Equal(1ul, result.TestUnsignedInt64);
-            }
+            Assert.Equal(1.000000000000001m, result.TestDecimal);
+            Assert.Equal(0.5, result.TestDouble);
+            Assert.Equal(0.5f, result.TestSingle);
+            Assert.Equal(1ul, result.TestUnsignedInt64);
         }
-#endif
+
+        [ConditionalFact]
+        public virtual void Cant_query_OrderBy_of_converted_types()
+        {
+            using var context = CreateContext();
+            var min = new BuiltInNullableDataTypes
+            {
+                Id = 217,
+                PartitionId = 205,
+                TestNullableDecimal = 2.000000000000001m,
+                TestNullableDateTimeOffset = new DateTimeOffset(2018, 1, 1, 12, 0, 0, TimeSpan.Zero),
+                TestNullableTimeSpan = TimeSpan.FromDays(2),
+                TestNullableUnsignedInt64 = 0
+            };
+            context.Add(min);
+
+            var max = new BuiltInNullableDataTypes
+            {
+                Id = 218,
+                PartitionId = 205,
+                TestNullableDecimal = 10.000000000000001m,
+                TestNullableDateTimeOffset = new DateTimeOffset(2018, 1, 1, 11, 0, 0, TimeSpan.FromHours(-2)),
+                TestNullableTimeSpan = TimeSpan.FromDays(10),
+                TestNullableUnsignedInt64 = long.MaxValue + 1ul
+            };
+            context.Add(max);
+
+            context.SaveChanges();
+
+            var query = context.Set<BuiltInNullableDataTypes>()
+                .Where(e => e.PartitionId == 205);
+
+            var ex = Assert.Throws<NotSupportedException>(
+                () => query
+                    .OrderBy(e => e.TestNullableDecimal)
+                    .First());
+            Assert.Equal(SqliteStrings.OrderByNotSupported("decimal"), ex.Message);
+
+            ex = Assert.Throws<NotSupportedException>(
+                () => query
+                    .OrderBy(e => e.TestNullableDateTimeOffset)
+                    .First());
+            Assert.Equal(SqliteStrings.OrderByNotSupported("DateTimeOffset"), ex.Message);
+
+            ex = Assert.Throws<NotSupportedException>(
+                () => query
+                    .OrderBy(e => e.TestNullableTimeSpan)
+                    .First());
+            Assert.Equal(SqliteStrings.OrderByNotSupported("TimeSpan"), ex.Message);
+
+            ex = Assert.Throws<NotSupportedException>(
+                () => query
+                    .OrderBy(e => e.TestNullableUnsignedInt64)
+                    .First());
+            Assert.Equal(SqliteStrings.OrderByNotSupported("ulong"), ex.Message);
+        }
+
+        [ConditionalFact]
+        public virtual void Cant_query_ThenBy_of_converted_types()
+        {
+            using var context = CreateContext();
+            var min = new BuiltInNullableDataTypes
+            {
+                Id = 219,
+                PartitionId = 206,
+                TestNullableDecimal = 2.000000000000001m,
+                TestNullableDateTimeOffset = new DateTimeOffset(2018, 1, 1, 12, 0, 0, TimeSpan.Zero),
+                TestNullableTimeSpan = TimeSpan.FromDays(2),
+                TestNullableUnsignedInt64 = 0
+            };
+            context.Add(min);
+
+            var max = new BuiltInNullableDataTypes
+            {
+                Id = 220,
+                PartitionId = 206,
+                TestNullableDecimal = 10.000000000000001m,
+                TestNullableDateTimeOffset = new DateTimeOffset(2018, 1, 1, 11, 0, 0, TimeSpan.FromHours(-2)),
+                TestNullableTimeSpan = TimeSpan.FromDays(10),
+                TestNullableUnsignedInt64 = long.MaxValue + 1ul
+            };
+            context.Add(max);
+
+            context.SaveChanges();
+
+            var query = context.Set<BuiltInNullableDataTypes>()
+                .Where(e => e.PartitionId == 206)
+                .OrderBy(e => e.PartitionId);
+
+            var ex = Assert.Throws<NotSupportedException>(
+                () => query
+                    .ThenBy(e => e.TestNullableDecimal)
+                    .First());
+            Assert.Equal(SqliteStrings.OrderByNotSupported("decimal"), ex.Message);
+
+            ex = Assert.Throws<NotSupportedException>(
+                () => query
+                    .ThenBy(e => e.TestNullableDateTimeOffset)
+                    .First());
+            Assert.Equal(SqliteStrings.OrderByNotSupported("DateTimeOffset"), ex.Message);
+
+            ex = Assert.Throws<NotSupportedException>(
+                () => query
+                    .ThenBy(e => e.TestNullableTimeSpan)
+                    .First());
+            Assert.Equal(SqliteStrings.OrderByNotSupported("TimeSpan"), ex.Message);
+
+            ex = Assert.Throws<NotSupportedException>(
+                () => query
+                    .ThenBy(e => e.TestNullableUnsignedInt64)
+                    .First());
+            Assert.Equal(SqliteStrings.OrderByNotSupported("ulong"), ex.Message);
+        }
+
+        public override void Object_to_string_conversion()
+        {
+            base.Object_to_string_conversion();
+
+            AssertSql(
+                @"SELECT ""b"".""Id"", ""b"".""Enum16"", ""b"".""Enum32"", ""b"".""Enum64"", ""b"".""Enum8"", ""b"".""EnumS8"", ""b"".""EnumU16"", ""b"".""EnumU32"", ""b"".""EnumU64"", ""b"".""PartitionId"", ""b"".""TestBoolean"", ""b"".""TestByte"", ""b"".""TestCharacter"", ""b"".""TestDateTime"", ""b"".""TestDateTimeOffset"", ""b"".""TestDecimal"", ""b"".""TestDouble"", ""b"".""TestInt16"", ""b"".""TestInt32"", ""b"".""TestInt64"", ""b"".""TestSignedByte"", ""b"".""TestSingle"", ""b"".""TestTimeSpan"", ""b"".""TestUnsignedInt16"", ""b"".""TestUnsignedInt32"", ""b"".""TestUnsignedInt64""
+FROM ""BuiltInDataTypes"" AS ""b""
+WHERE ""b"".""Id"" = 13",
+                //
+                @"SELECT ""b"".""TestSignedByte"", ""b"".""TestByte"", ""b"".""TestInt16"", ""b"".""TestUnsignedInt16"", ""b"".""TestInt32"", ""b"".""TestUnsignedInt32"", ""b"".""TestInt64"", ""b"".""TestUnsignedInt64"", ""b"".""TestSingle"", ""b"".""TestDouble"", ""b"".""TestDecimal"", ""b"".""TestCharacter"", ""b"".""TestDateTime"", ""b"".""TestDateTimeOffset"", ""b"".""TestTimeSpan""
+FROM ""BuiltInDataTypes"" AS ""b""
+WHERE ""b"".""Id"" = 13");
+        }
+
+        private void AssertTranslationFailed(Action testCode)
+            => Assert.Contains(
+                CoreStrings.TranslationFailed("").Substring(21),
+                Assert.Throws<InvalidOperationException>(testCode).Message);
+
+        private void AssertSql(params string[] expected)
+            => Fixture.TestSqlLoggerFactory.AssertBaseline(expected);
 
         public class BuiltInDataTypesSqliteFixture : BuiltInDataTypesFixtureBase
         {
@@ -1497,6 +1527,8 @@ namespace Microsoft.EntityFrameworkCore
             public override bool SupportsUnicodeToAnsiConversion => true;
 
             public override bool SupportsLargeStringComparisons => true;
+
+            public override bool SupportsDecimalComparisons => false;
 
             protected override ITestStoreFactory TestStoreFactory => SqliteTestStoreFactory.Instance;
             public TestSqlLoggerFactory TestSqlLoggerFactory => (TestSqlLoggerFactory)ListLoggerFactory;
@@ -1592,13 +1624,9 @@ namespace Microsoft.EntityFrameworkCore
                         b.Property(e => e.Decimal).HasColumnType("decimal(3)");
                     });
 
-                modelBuilder.Entity<MappedPrecisionAndScaledDataTypesWithIdentity>(b => b.Property(e => e.Decimal).HasColumnType("decimal(5, 2)"));
+                modelBuilder.Entity<MappedPrecisionAndScaledDataTypesWithIdentity>(
+                    b => b.Property(e => e.Decimal).HasColumnType("decimal(5, 2)"));
             }
-
-            public override DbContextOptionsBuilder AddOptions(DbContextOptionsBuilder builder)
-                => base.AddOptions(builder).ConfigureWarnings(
-                    c => c.Log(RelationalEventId.QueryClientEvaluationWarning)
-                        .Log(RelationalEventId.ValueConversionSqlLiteralWarning));
 
             public override bool SupportsBinaryKeys => true;
 

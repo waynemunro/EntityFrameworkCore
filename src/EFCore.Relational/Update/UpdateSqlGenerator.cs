@@ -1,23 +1,30 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using JetBrains.Annotations;
-using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.Utilities;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Microsoft.EntityFrameworkCore.Update
 {
     /// <summary>
     ///     <para>
-    ///         A a base class for the <see cref="IUpdateSqlGenerator" /> service that is typically inherited from
+    ///         A base class for the <see cref="IUpdateSqlGenerator" /> service that is typically inherited from
     ///         by database providers.
     ///     </para>
     ///     <para>
     ///         This type is typically used by database providers; it is generally not used in application code.
+    ///     </para>
+    ///     <para>
+    ///         The service lifetime is <see cref="ServiceLifetime.Singleton" />. This means a single instance
+    ///         is used by many <see cref="DbContext" /> instances. The implementation must be thread-safe.
+    ///         This service cannot depend on services registered as <see cref="ServiceLifetime.Scoped" />.
     ///     </para>
     /// </summary>
     public abstract class UpdateSqlGenerator : IUpdateSqlGenerator
@@ -82,7 +89,8 @@ namespace Microsoft.EntityFrameworkCore.Update
         /// <param name="command"> The command that represents the delete operation. </param>
         /// <param name="commandPosition"> The ordinal of this command in the batch. </param>
         /// <returns> The <see cref="ResultSetMapping" /> for the command. </returns>
-        public virtual ResultSetMapping AppendUpdateOperation(StringBuilder commandStringBuilder, ModificationCommand command, int commandPosition)
+        public virtual ResultSetMapping AppendUpdateOperation(
+            StringBuilder commandStringBuilder, ModificationCommand command, int commandPosition)
         {
             Check.NotNull(commandStringBuilder, nameof(commandStringBuilder));
             Check.NotNull(command, nameof(command));
@@ -114,7 +122,8 @@ namespace Microsoft.EntityFrameworkCore.Update
         /// <param name="command"> The command that represents the delete operation. </param>
         /// <param name="commandPosition"> The ordinal of this command in the batch. </param>
         /// <returns> The <see cref="ResultSetMapping" /> for the command. </returns>
-        public virtual ResultSetMapping AppendDeleteOperation(StringBuilder commandStringBuilder, ModificationCommand command, int commandPosition)
+        public virtual ResultSetMapping AppendDeleteOperation(
+            StringBuilder commandStringBuilder, ModificationCommand command, int commandPosition)
         {
             Check.NotNull(commandStringBuilder, nameof(commandStringBuilder));
             Check.NotNull(command, nameof(command));
@@ -147,7 +156,7 @@ namespace Microsoft.EntityFrameworkCore.Update
 
             AppendInsertCommandHeader(commandStringBuilder, name, schema, writeOperations);
             AppendValuesHeader(commandStringBuilder, writeOperations);
-            AppendValues(commandStringBuilder, writeOperations);
+            AppendValues(commandStringBuilder, name, schema, writeOperations);
             commandStringBuilder.AppendLine(SqlGenerationHelper.StatementTerminator);
         }
 
@@ -318,18 +327,19 @@ namespace Microsoft.EntityFrameworkCore.Update
             commandStringBuilder.Append(" SET ")
                 .AppendJoin(
                     operations,
-                    SqlGenerationHelper,
-                    (sb, o, helper) =>
+                    (this, name, schema),
+                    (sb, o, p) =>
                     {
-                        helper.DelimitIdentifier(sb, o.ColumnName);
+                        var (g, n, s) = p;
+                        g.SqlGenerationHelper.DelimitIdentifier(sb, o.ColumnName);
                         sb.Append(" = ");
                         if (!o.UseCurrentValueParameter)
                         {
-                            AppendSqlLiteral(sb, o.Value, o.Property);
+                            g.AppendSqlLiteral(sb, o, n, s);
                         }
                         else
                         {
-                            helper.GenerateParameterNamePlaceholder(sb, o.ParameterName);
+                            g.SqlGenerationHelper.GenerateParameterNamePlaceholder(sb, o.ParameterName);
                         }
                     });
         }
@@ -394,9 +404,13 @@ namespace Microsoft.EntityFrameworkCore.Update
         ///     Appends values after a <see cref="AppendValuesHeader" /> call.
         /// </summary>
         /// <param name="commandStringBuilder"> The builder to which the SQL should be appended. </param>
+        /// <param name="name"> The name of the table. </param>
+        /// <param name="schema"> The table schema, or <c>null</c> to use the default schema. </param>
         /// <param name="operations"> The operations for which there are values. </param>
         protected virtual void AppendValues(
             [NotNull] StringBuilder commandStringBuilder,
+            [NotNull] string name,
+            [CanBeNull] string schema,
             [NotNull] IReadOnlyList<ColumnModification> operations)
         {
             Check.NotNull(commandStringBuilder, nameof(commandStringBuilder));
@@ -408,18 +422,19 @@ namespace Microsoft.EntityFrameworkCore.Update
                     .Append("(")
                     .AppendJoin(
                         operations,
-                        SqlGenerationHelper,
-                        (sb, o, helper) =>
+                        (this, name, schema),
+                        (sb, o, p) =>
                         {
                             if (o.IsWrite)
                             {
+                                var (g, n, s) = p;
                                 if (!o.UseCurrentValueParameter)
                                 {
-                                    AppendSqlLiteral(sb, o.Value, o.Property);
+                                    g.AppendSqlLiteral(sb, o, n, s);
                                 }
                                 else
                                 {
-                                    helper.GenerateParameterNamePlaceholder(sb, o.ParameterName);
+                                    g.SqlGenerationHelper.GenerateParameterNamePlaceholder(sb, o.ParameterName);
                                 }
                             }
                             else
@@ -533,7 +548,7 @@ namespace Microsoft.EntityFrameworkCore.Update
                 if (!columnModification.UseCurrentValueParameter
                     && !columnModification.UseOriginalValueParameter)
                 {
-                    AppendSqlLiteral(commandStringBuilder, columnModification.Value, columnModification.Property);
+                    AppendSqlLiteral(commandStringBuilder, columnModification, null, null);
                 }
                 else
                 {
@@ -588,12 +603,30 @@ namespace Microsoft.EntityFrameworkCore.Update
             SqlGenerationHelper.DelimitIdentifier(commandStringBuilder, Check.NotNull(name, nameof(name)), schema);
         }
 
-        private void AppendSqlLiteral(StringBuilder commandStringBuilder, object value, IProperty property)
+        private void AppendSqlLiteral(StringBuilder commandStringBuilder, ColumnModification modification, string tableName, string schema)
         {
-            var mapping = property != null
-                ? Dependencies.TypeMappingSource.FindMapping(property)
-                : null;
-            mapping = mapping ?? Dependencies.TypeMappingSource.GetMappingForValue(value);
+            var value = modification.Value;
+            var mapping = modification.Property != null
+                ? (RelationalTypeMapping)modification.Property.GetTypeMapping()
+                : value != null
+                    ? Dependencies.TypeMappingSource.FindMapping(value.GetType(), modification.ColumnType)
+                    : Dependencies.TypeMappingSource.FindMapping(modification.ColumnType);
+
+            if (mapping == null)
+            {
+                var columnName =  modification.ColumnName;
+                if (tableName != null)
+                {
+                    columnName = tableName + "." + columnName;
+
+                    if (schema != null)
+                    {
+                        columnName = schema + "." + columnName;
+                    }
+                }
+
+               throw new InvalidOperationException(RelationalStrings.UnsupportedDataOperationStoreType(modification.ColumnType, columnName));
+            }
             commandStringBuilder.Append(mapping.GenerateProviderValueSqlLiteral(value));
         }
     }
